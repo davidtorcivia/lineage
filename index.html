@@ -1,0 +1,641 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Lineage</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@9.1.15/dist.min.js"></script>
+<style>
+:root{--bg:#0b0c0f;--ink:#ebe5d8;--dim:#938d80;--panel:rgba(22,23,28,.72);--solid:rgba(18,19,23,.94);--line:rgba(255,255,255,.1);--sans:Inter,system-ui,sans-serif}
+:root[data-theme=light]{--bg:#f3eee5;--ink:#2a2118;--dim:#7a6c5a;--panel:rgba(251,248,242,.72);--solid:rgba(251,248,242,.95);--line:rgba(42,33,24,.13)}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:'Source Serif 4',Georgia,serif;font-optical-sizing:auto;text-rendering:optimizeLegibility;overflow:hidden;-webkit-tap-highlight-color:transparent;transition:background-color .4s}
+#deck,#map{position:fixed;inset:0;width:100%;height:100%;transition:opacity .28s ease}
+#deck{touch-action:none}
+.fade{opacity:0}
+.glass{background:var(--panel);-webkit-backdrop-filter:blur(16px) saturate(1.3);backdrop-filter:blur(16px) saturate(1.3);border:1px solid var(--line)}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;display:block}
+nav{position:fixed;top:12px;left:12px;right:12px;z-index:8;display:flex;align-items:center;gap:10px;pointer-events:none}
+nav>*{pointer-events:auto}
+.views{display:flex;gap:2px;padding:4px;border-radius:999px;overflow-x:auto;scrollbar-width:none}
+.views button{background:none;border:0;color:var(--dim);font:500 13px var(--sans);padding:7px 14px;border-radius:999px;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
+.views button.on{background:var(--ink);color:var(--bg)}
+.tools{margin-left:auto;display:flex;gap:6px}
+.tools button,.round{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--ink);cursor:pointer;padding:0}
+#axis{position:fixed;z-index:4;pointer-events:none;border-radius:12px;overflow:hidden;transition:opacity .25s;left:12px;top:64px;bottom:12px;width:50px}
+#axis span{position:absolute;right:9px;transform:translateY(-50%);font:11px var(--sans);color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
+#axis span::after{content:'';position:absolute;right:-9px;top:50%;width:5px;border-top:1px solid var(--dim);opacity:.6}
+#legend{position:fixed;right:12px;bottom:12px;z-index:5;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 4px;max-width:min(62vw,640px);padding:5px 8px;border-radius:18px;font:12px var(--sans);color:var(--dim)}
+#legend button{all:unset;cursor:default;white-space:nowrap;padding:3px 8px;border-radius:999px;transition:background .15s,color .15s}
+#legend button:hover,#legend button.on{background:var(--line);color:var(--ink)}
+#legend button::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px;box-shadow:0 0 0 2px var(--bg)}
+#ctrl{position:fixed;right:12px;bottom:calc(var(--lh,40px) + 20px);z-index:5;display:flex;align-items:center;gap:10px;padding:5px 6px 5px 14px;border-radius:999px;font:500 12px var(--sans);color:var(--dim);transition:opacity .25s}
+#ctrl input{width:min(26vw,200px);accent-color:var(--ink)}
+.pill{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;font:500 12px var(--sans);color:var(--ink);background:var(--line)}
+.pill[hidden]{display:none}
+.pill:hover{background:var(--ink);color:var(--bg)}
+.pill svg{width:14px;height:14px}
+#legend,#ctrl,#time{transition:right .4s cubic-bezier(.2,.8,.2,1),opacity .25s}
+body.po #legend,body.po #ctrl,body.po #time{right:calc(min(400px,100vw - 24px) + 24px)}
+body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)}
+#cap{position:fixed;left:74px;bottom:12px;z-index:5;max-width:31em;padding:12px 16px;border-radius:14px;font-size:15px;line-height:1.45;color:var(--dim);transition:opacity .25s}
+#cap.hide{opacity:0;pointer-events:none}
+#time{position:fixed;right:12px;bottom:calc(var(--lh,40px) + 20px);z-index:5;display:none;align-items:center;gap:12px;padding:5px 16px 5px 5px;border-radius:999px}
+#play{width:36px;height:36px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;cursor:pointer}
+#play svg{width:16px;height:16px;fill:currentColor;stroke:none}
+#time input{width:min(34vw,340px);accent-color:var(--ink)}
+#time span{font:500 18px var(--sans);font-variant-numeric:tabular-nums;min-width:46px;text-align:right}
+#tip{position:fixed;pointer-events:none;color:var(--ink);border-radius:10px;padding:9px 12px;font:13px/1.45 var(--sans);opacity:0;z-index:9;max-width:300px;transition:opacity .15s}
+#tip b{display:block;font:600 16px/1.25 'Source Serif 4',Georgia,serif;margin-bottom:2px}#tip small{color:var(--dim)}
+#panel{position:fixed;top:64px;right:12px;bottom:12px;width:min(400px,calc(100vw - 24px));z-index:7;border-radius:18px;overflow:auto;background:var(--solid);padding:20px 22px 28px;transform:translateX(calc(100% + 24px));transition:transform .4s cubic-bezier(.2,.8,.2,1);overscroll-behavior:contain}
+#panel.open{transform:none}
+#panel .x{position:sticky;top:0;float:right;margin:-6px -8px 0 0;background:var(--panel)}
+#panel img{width:100%;max-height:280px;object-fit:cover;object-position:50% 25%;border-radius:12px;margin:0 0 14px;display:block}
+#panel h2{font-size:27px;line-height:1.15;font-weight:600;margin:0 0 6px}
+#panel .meta{font:13px/1.5 var(--sans);color:var(--dim);margin:0 0 12px}
+#panel .rel{font-size:17px;margin:0 0 4px}
+#panel .acts{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0 0}
+#panel h3{font-size:17px;font-weight:600;margin:24px 0 8px}
+#panel ol,#panel ul{list-style:none;padding:0;margin:0;font:13px/1.5 var(--sans)}
+#panel li button{all:unset;cursor:pointer;color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+#panel li button:hover{text-decoration-color:var(--ink)}
+#panel .path li{display:inline}#panel .path li+li::before{content:' › ';color:var(--dim)}
+#panel .kids li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line)}
+#panel .kids li.line{font-weight:500}
+#panel .kids small{color:var(--dim);font-variant-numeric:tabular-nums}
+#panel .bio{font-size:15.5px;line-height:1.55;overflow-wrap:anywhere}
+#panel .bio h2,#panel .bio h3{font-size:17px;font-weight:600;margin:20px 0 6px}
+#panel .bio a{color:inherit;text-decoration-color:var(--dim);text-underline-offset:3px}
+#panel .bio ol,#panel .bio ul{font:13px/1.5 var(--sans);color:var(--dim);padding-left:18px;list-style:revert}
+#panel .bio sup{font-size:10px}
+#panel .wt{display:inline-flex;align-items:center;gap:6px;margin-top:22px;font:500 13px var(--sans);color:var(--ink)}
+#panel .wt svg{width:15px;height:15px}
+#msg{position:fixed;inset:0;display:grid;place-items:center;font-size:18px;color:var(--dim)}
+.maplibregl-ctrl-attrib{font-family:var(--sans);font-size:10px}
+@media (max-width:720px){
+  nav{top:8px;left:8px;right:8px;gap:6px} .views button{padding:7px 11px;font-size:12.5px} .tools button{width:34px;height:34px}
+  #axis{left:6px;top:56px;width:42px;bottom:96px} #axis span{right:7px}
+  #legend{left:8px;right:8px;bottom:8px;max-width:none;justify-content:flex-start;max-height:31px;overflow:hidden}
+  #legend.open{max-height:none}
+  #ctrl,#time{left:8px;right:8px;bottom:calc(var(--lh,31px) + 14px)} #ctrl input,#time input{flex:1;width:auto}
+  #cap{left:8px;right:8px;bottom:96px;max-width:none}
+  body.po #legend,body.po #ctrl,body.po #time{right:8px;opacity:0;pointer-events:none}
+  #panel{top:auto;left:8px;right:8px;bottom:8px;width:auto;height:72vh;transform:translateY(calc(100% + 16px))}
+}
+</style></head>
+<body>
+<div id="map" hidden></div><div id="deck"></div>
+<div id="axis" class="glass"></div>
+<nav><div class="views glass"></div>
+  <div class="tools">
+    <button id="info" class="glass" title="About this view"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6v.1"/></svg></button>
+    <button id="home" class="glass" title="Fit (0)"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></button>
+    <button id="theme" class="glass" title="Light / dark (t)"><svg class="i" viewBox="0 0 24 24" id="themeIcon"></svg></button>
+  </div></nav>
+<div id="cap" class="glass"></div>
+<div id="ctrl" class="glass"><span>Spread</span><input id="spread" type="range" min="0" max="1" step="0.001" value="0" title="Widen horizontally ([ and ])"><button id="even" class="pill" hidden>Even out</button></div>
+<div id="time" class="glass"><button id="play" title="Play (space)"></button><input id="yr" type="range" max="2026" step="1"><span id="yrl"></span></div>
+<div id="legend" class="glass"></div>
+<aside id="panel"></aside>
+<div id="tip" class="glass"></div>
+<div id="msg">Loading your family…</div>
+<script>
+const $ = s => document.querySelector(s);
+const ICON = {
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
+  moon: '<path d="M20 14.6A8.2 8.2 0 0 1 9.4 4 8.2 8.2 0 1 0 20 14.6Z"/>',
+  play: '<svg viewBox="0 0 24 24"><path d="M8 5.6v12.8a.8.8 0 0 0 1.2.7l10.2-6.4a.8.8 0 0 0 0-1.4L9.2 4.9A.8.8 0 0 0 8 5.6Z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2"/><rect x="13.5" y="5" width="4" height="14" rx="1.2"/></svg>',
+  close: '<svg class="i" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>',
+  ext: '<svg class="i" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-8.5 8.5M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>',
+  widen: '<svg class="i" viewBox="0 0 24 24"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M3 12h18"/></svg>',
+  even: '<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+};
+
+// ================= regions: colour follows region, in a fixed order around the colour wheel =================
+// Hues step around the wheel in roughly geographic order; dark-theme steps are luminous for the black ground.
+const R = (k, d, l, re) => ({k, c: [d, l], re});
+const IT = R('Italian & Mediterranean', '#e0524a', '#c23a35', /ital|sicil|sardegna|sardinia|napoli|palermo|agrigento|regno d|saluzzo|toscan|lombard|venezia|byzant|constantinople|armenia|greece|turkey|jerusalem|imperium romanum|^roman empire|albania|durazzo|cyprus|antioch|syria|egypt/i);
+const IB = R('Iberian', '#f08c2e', '#dd7a1f', /spain|españa|espana|castil|le(ó|o)n\b|arag(o|ó)n|navarr|pamplona|asturias|galicia|portugal|barcelona|catalu|ribagorza|besal|hispania|urgell|cerdanya/i);
+const GE = R('German & Low Countries', '#d8b04a', '#a8800f', /german|deutsch|alemanha|preu(ss|ß)en|prussia|bayern|bavaria|rhein|ren(â|a)nia|westfal|vestf|hessen|baden|w(ü|u)rtt|sachsen|saxony|holy roman|heilig|saint-empire|sacro romano|hannover|hanover|pfalz|palatinate|lotharingia|belgi|netherlands|nederland|holland|flanders|flandre|vlaanderen|brabant|hainaut|luxemb|switzerland|schweiz|austria|österreich|carinthia|frisia|th(ü|u)ring|nordgau|swabia|schwaben/i);
+const AM = R('American', '#7cc35c', '#4e9c3c', /\b(usa|u\.s\.a|united states|america|colony|new england|plymouth|new york|pennsylvania|massachusetts|connecticut|new jersey|rhode island|vermont|new hampshire|maine|ohio|michigan|illinois|wisconsin|minnesota|maryland|virginia|delaware|florida|california|kentucky|indiana|iowa|missouri)\b/i);
+const CE = R('Irish, Welsh & Scottish', '#22b391', '#078a6c', /ireland|(é|e)ire|wales|cymru|scotland|alba\b|powys|gwynedd|dyfed|deheubarth|gwent|morgannwg|anglesey|garth madryn|isle of man|cornwall|kernow|dumnonia|strathclyde/i);
+const SCN = R('Scandinavian', '#38bfe6', '#0a9cc8', /scandi|norway|norge|denmark|danmark|sweden|sverige|iceland|orkney|jutland|vestfold|hedmark|hedermark|telemark|agder|akershus|oppland|tr(ø|o)ndelag|m(ø|o)re|sogn|(ø|o)stlandet|haithabu|hleithra|reidgotaland|onundfjord|jarldom|viken|uppsala/i);
+const EN = R('English', '#4a8bf0', '#2563c4', /england|angleterre|northumbria|wessex|mercia|east anglia|united kingdom|great britain|britain|britannia|brittania|jersey|guernsey/i);
+const FR = R('French & Québécois', '#b48cf2', '#8a5ad6', /france|francia|francie|francs|frankish|fr(ä|a)nkisch|carolingi|austrasi|neustria|burgond|burgund|bourgogne|provence|toulouse|gascogne|gasco(ñ|n)a|gascony|aquitaine|savoie|limoges|armorica|cornouaille|anjou|poitou|champagne|qu(é|e)bec|nouvelle|new france|acadi|bas-canada|lower canada|lorraine|alsace|normandie|normandy|bretagne|brittany|perche|canada|gen(è|e)ve/i);
+const EA = R('Eastern European', '#e0609f', '#b83f84', /poland|polska|wielkopolska|kiev|kyiv|ukrain|russia|\brus\b|rus'|novgorod|polotsk|hungar|magyar|bohemia|(č|c)echy|morav|pannonia|croatia|serbia|bulgaria|lithuania|central asia|dentumogeria|yakutia|[Ѐ-ӿ]/i);
+const UNK = R('Unknown', '#57544e', '#b8af9f', /$^/);
+// where each region can plausibly be (lon0, lat0, lon1, lat1); a geocode outside these is a wrong match
+const BOX = new Map([[IT, [[-10, 28, 45, 48]]], [IB, [[-10, 35, 4.5, 44.5]]], [GE, [[1.5, 44, 26, 56]]], [AM, [[-170, 15, -50, 72]]],
+  [CE, [[-11, 49.8, -1, 61]]], [SCN, [[4, 53.5, 32, 72], [-25, 62.5, -12, 67.5], [-4, 58, 0, 61]]], [EN, [[-7, 49, 2, 56.5]]],
+  [FR, [[-5.5, 41, 10, 51.6], [-80, 42, -52, 53], [-95, 28, -88, 33]]], [EA, [[12, 34, 60, 72]]]]);
+function plausible(loc, ll, era) {
+  if (!ll || !ll.length) return null;
+  const cu = culture(loc), [x, y] = ll;
+  if (cu) return BOX.get(cu).some(([a, b, c, d]) => x >= a && x <= c && y >= b && y <= d) ? ll : null;
+  if (era < 1500 && !(x > -25 && x < 60 && y > 25 && y < 72)) return null;   // medieval: Europe and the Near East only
+  if (era < 1750 && (y < 15 || x > 60)) return null;
+  return ll;
+}
+const REGIONS = [IT, IB, GE, AM, CE, SCN, EN, FR, EA];
+function culture(loc) {   // first segment that names a known place wins ("Edinburgh, Scotland, United Kingdom" -> Scottish)
+  if (!loc) return null;
+  for (const s of loc.split(',').map(x => x.trim())) for (const c of REGIONS) if (c.re.test(s)) return c;
+  return null;
+}
+function regionAt(lon, lat) {   // fallback from geocoded coordinates when the place name didn't say
+  if (lon < -50) return lat > 45 && lon > -80 ? FR : AM;
+  if (lat > 54.5 && lon > 4 && lon < 35) return SCN;
+  if (lon < -5.4 && lat > 51.3 && lat < 55.5) return CE;
+  if (lon < 1.8 && lat > 49.9 && lat < 61) return lat > 55.1 || (lon < -3 && lat > 51.3 && lat < 53.5) || lon < -4.8 ? CE : EN;
+  if (lon < 3.4 && lat > 35 && lat < 43.8) return IB;
+  if (lon >= 6.6 && lon < 19 && lat > 36 && lat < 46.6) return IT;
+  if (lon > -5 && lon < 8.2 && lat > 42 && lat < 51.1) return FR;
+  if (lon >= 3 && lon < 17 && lat >= 45.8 && lat < 55.5) return GE;
+  if (lat < 42 && lon > 19) return IT;
+  if (lon >= 15) return EA;
+  return null;
+}
+
+// ================= data =================
+const yr = d => { const m = /^(\d{4})/.exec(d || ''); return m && m[1] !== '0000' ? +m[1] : null; };
+let N = [], ROOT, Y0 = 1450, leafN = 0, LEAVES = [];
+const BY = p => p.by ?? p.byE;
+const TP = .6, tn = v => 1 - Math.pow(Math.max(0, 2026 - v) / (2026 - Y0), TP);   // Y0 -> 0, today -> 1
+async function load() {
+  const [tree, places] = await Promise.all([fetch('tree.json').then(r => r.json()), fetch('places.json').then(r => r.json()).catch(() => ({}))]);
+  const P = tree.people, G = loc => { const g = places[(loc || '').trim()]; return g?.length >= 5 ? [g[0], g[1]] : null; };   // only verified geocodes
+  const jit = (ll, id, s) => [ll[0] + ((id % 97) / 97 - .5) * s, ll[1] + ((id % 89) / 89 - .5) * s * .66];
+  for (const p of Object.values(P)) {
+    p.given = p.FirstName || p.RealName || 'Unknown'; p.sur = p.LastNameAtBirth || p.LastNameCurrent || '';
+    p.by = yr(p.BirthDate); p.dy = yr(p.DeathDate);
+    // a pre-1500 place that geocoded to the Americas is a name collision (a US town sharing a medieval name): ignore it
+    const era = p.by ?? p.dy ?? 1500, ok = loc => plausible(loc, G(loc), era);
+    const b = ok(p.BirthLocation), d = ok(p.DeathLocation), m = (p.Marriages || []).map(x => ok(x.place)).find(Boolean);
+    const hasBirth = !!(p.BirthLocation || '').trim();
+    p.loc = hasBirth ? b : d || m; p.how = !p.loc ? (hasBirth ? 'pending' : null) : hasBirth ? 'birth' : d ? 'death' : 'marriage';
+    if (p.loc) p.loc = jit(p.loc, p.Id, .04);
+    p.cu = culture(p.BirthLocation) || culture(p.DeathLocation) || (b && regionAt(...b)) || (d && regionAt(...d)) || UNK;
+  }
+  // nodes: one per place a person occupies in the pedigree. A person reached again (pedigree collapse) is a
+  // leaf marked dup; their ancestry is drawn once, at their nearest generation.
+  const md = {[tree.root]: 0}, q = [tree.root];
+  while (q.length) { const i = q.shift(); for (const k of ['Father', 'Mother']) { const j = P[i][k]; if (j > 0 && P[j] && md[j] == null) { md[j] = md[i] + 1; q.push(j); } } }
+  const done = new Set();
+  const mk = (id, g, c, side) => {
+    const n = {p: P[id], g, c, side, f: null, m: null, dup: false, pre: N.length}; N.push(n);
+    if (md[id] === g && !done.has(id)) {
+      done.add(id);
+      const fa = P[id].Father, mo = P[id].Mother;
+      if (fa > 0 && P[fa]) n.f = mk(fa, g + 1, n, side || 'paternal');
+      if (mo > 0 && P[mo]) n.m = mk(mo, g + 1, n, side || 'maternal');
+    } else n.dup = true;
+    n.post = N.length - 1; return n;
+  };
+  ROOT = mk(tree.root, 0, null, null);
+  for (const n of N) {   // children come before their parents in N, so estimates and places flow up the tree
+    const p = n.p;
+    if (p.by == null && p.byE == null) p.byE = n.c ? BY(n.c.p) - (p.Gender === 'Female' ? 27 : 31) : p.dy ? p.dy - 55 : 1990;
+  }
+  // no place of their own: share the place of an adjacent parent or child who has one; otherwise leave them off the map
+  for (const n of N) {
+    const p = n.p; if (p.loc || p.how === 'pending') continue;
+    const k = [n.c?.p, n.f?.p, n.m?.p].find(q => q?.loc && q.how !== 'inferred');
+    if (k) { p.loc = jit(k.loc, p.Id, .02); p.how = 'inferred'; }
+  }
+  Y0 = Math.floor((Math.min(...N.map(n => BY(n.p))) - 20) / 50) * 50;
+  (function tidy(n) {
+    const ks = [n.f, n.m].filter(Boolean); ks.forEach(tidy);
+    n.n = 1 + ks.reduce((s, k) => s + k.n, 0);
+    if (!ks.length) { n.lo = n.hi = leafN++; LEAVES.push(n); }
+    else { n.lo = Math.min(...ks.map(k => k.lo)); n.hi = Math.max(...ks.map(k => k.hi)); }
+  })(ROOT);
+  place(() => 1); N.forEach(n => n.un = n.un1);
+  $('#yr').min = Y0;
+}
+// horizontal placement: each leaf line gets a share of the width proportional to its weight
+function place(weight) {
+  let acc = 0;
+  for (const l of LEAVES) { const w = weight(l); l.u1 = acc + w / 2; acc += w; }
+  (function up(n) { const ks = [n.f, n.m].filter(Boolean); ks.forEach(up); if (ks.length) n.u1 = ks.reduce((s, k) => s + k.u1, 0) / ks.length; })(ROOT);
+  N.forEach(n => n.un1 = n.u1 / acc);
+}
+
+// ================= shared helpers =================
+let dark = matchMedia('(prefers-color-scheme: dark)').matches;
+try { const t = localStorage.getItem('lineage-theme'); if (t) dark = t === 'dark'; } catch {}
+const bgc = () => getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+const life = p => `${p.by ?? (p.byE ? 'c. ' + p.byE : '?')}–${p.dy ?? (p.IsLiving ? '' : '?')}`;
+function rel(n) {
+  if (!n.c) return 'You';
+  const w = n.p.Gender === 'Female' ? 'mother' : n.p.Gender === 'Male' ? 'father' : 'parent', k = n.g - 2;
+  const t = n.g === 1 ? w : n.g === 2 ? 'grand' + w : (k === 1 ? 'great-' : k + '× great-') + 'grand' + w;
+  return t[0].toUpperCase() + t.slice(1) + (n.g > 1 ? `, ${n.side} side` : '');
+}
+const chain = n => { const out = []; for (let c = n.c; c && c.c; c = c.c) out.unshift(c); return out; };   // your parent … their child
+// focus: a person (hovered or selected) lights their lineage — everyone above them, the chain down to you and their
+// other appearances; a hovered legend region lights everyone born there
+let sel = null, hov = null, hlCu = null, pinCu = null;
+const person = () => hov || sel;
+const focusing = () => !!(hov || sel || hlCu);
+function lit(n) {
+  if (hlCu && !hov) return n.p.cu === hlCu;
+  const s = person(); if (!s) return true;
+  return (s.pre <= n.pre && n.pre <= s.post) || (n.pre <= s.pre && s.pre <= n.post) || n.p === s.p;
+}
+const tip = $('#tip');
+function showTip(n, x, y) {
+  if (!n) { tip.style.opacity = 0; return; }
+  tip.innerHTML = `<b>${n.p.given} ${n.p.sur}</b>${life(n.p)}${n.p.BirthLocation ? ' · ' + n.p.BirthLocation.split(',')[0] : ''}<br><small>${rel(n)}</small>`;
+  tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.max(8, Math.min(x + 16, innerWidth - r.width - 8)) + 'px';
+  tip.style.top = (y + 18 + r.height > innerHeight ? y - r.height - 12 : y + 18) + 'px';
+}
+
+// ================= detail panel =================
+const panel = $('#panel');
+function cleanBio(html) {
+  const d = new DOMParser().parseFromString(html || '', 'text/html');
+  d.querySelectorAll('script,style,iframe,object,form').forEach(e => e.remove());
+  d.querySelectorAll('*').forEach(e => { for (const a of [...e.attributes]) if (/^on/i.test(a.name)) e.removeAttribute(a.name); });
+  d.querySelectorAll('a').forEach(a => { const h = a.getAttribute('href') || ''; if (h.startsWith('/')) a.href = 'https://www.wikitree.com' + h; if (!h.startsWith('#')) { a.target = '_blank'; a.rel = 'noopener'; } });
+  d.querySelectorAll('img').forEach(i => { const s = i.getAttribute('src') || ''; if (s.startsWith('/')) i.src = 'https://www.wikitree.com' + s; });
+  return d.body.innerHTML;
+}
+const BIOS = {};   // bios are sharded by Id % 64 so one open fetches ~1MB
+const bio = async id => (await (BIOS[id % 64] ??= fetch(`bios/${id % 64}.json`).then(r => r.json())))[id] || '';
+function openPanel(n) {
+  const p = n.p, lineKid = n.c?.p.Id;
+  const places = [p.BirthLocation && `Born in ${p.BirthLocation}`, p.DeathLocation && `died in ${p.DeathLocation}`].filter(Boolean).join(', ');
+  panel.innerHTML = `<button class="x round glass" title="Close (Esc)">${ICON.close}</button>
+    ${p.photo ? `<img src="${p.photo}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+    <h2>${p.given} ${p.MiddleName ? p.MiddleName + ' ' : ''}${p.sur}</h2>
+    <p class="meta">${life(p)}${p.byE && p.by == null ? ' (birth year estimated)' : ''}${places ? '<br>' + places : ''}</p>
+    <p class="rel">${rel(n)}${n.dup ? ' (also appears elsewhere in your tree)' : ''}</p>
+    ${n.g > 1 ? `<ol class="path">${chain(n).map(c => `<li><button data-pre="${c.pre}">${c.p.given}</button></li>`).join('')}</ol>` : ''}
+    ${!VIEW.map && n.c && n.hi > n.lo ? `<div class="acts"><button class="pill" data-act="widen">${ICON.widen}Give this branch room</button>${widened ? `<button class="pill" data-act="even">${ICON.even}Even out</button>` : ''}</div>` : ''}
+    ${p.Kids?.length ? `<h3>Children</h3><ul class="kids">${p.Kids.map(k => `<li class="${k.Id === lineKid ? 'line' : ''}"><span>${k.FirstName || ''} ${k.LastNameAtBirth || ''}</span><small>${yr(k.BirthDate) ?? ''}</small></li>`).join('')}</ul>` : ''}
+    ${p.Marriages?.length ? `<h3>Marriages</h3><ul class="kids">${p.Marriages.map(m => `<li><span>${m.place || 'Place not recorded'}</span><small>${yr(m.date) ?? ''}</small></li>`).join('')}</ul>` : ''}
+    ${p.hasBio ? `<div class="bio" data-id="${p.Id}"><p class="meta">Loading…</p></div>` : ''}
+    <a class="wt" href="https://www.wikitree.com/wiki/${encodeURIComponent(p.Name)}" target="_blank" rel="noopener">Open on WikiTree ${ICON.ext}</a>`;
+  panel.classList.add('open'); document.body.classList.add('po'); panel.scrollTop = 0;
+  if (p.hasBio) bio(p.Id).then(h => { const el = panel.querySelector(`.bio[data-id="${p.Id}"]`); if (el) el.innerHTML = cleanBio(h); });
+  panel.querySelector('.x').onclick = closePanel;
+  panel.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => select(N[+b.dataset.pre], true));
+  panel.querySelector('[data-act=widen]')?.addEventListener('click', () => widen(n));
+  panel.querySelector('[data-act=even]')?.addEventListener('click', () => widen(null));
+}
+function closePanel() { panel.classList.remove('open'); document.body.classList.remove('po'); if (sel) { sel = null; refocus(); } }
+function select(n, fly) {
+  sel = n; openPanel(n); refocus();
+  if (VIEW.map) { if (fly && n.p.loc) map.flyTo({center: n.p.loc, zoom: Math.max(map.getZoom(), 6)}); return; }
+  if (fly) { const [x, y] = VIEW.sat(n), z = Math.max(vs.zoom, 1.6), off = innerWidth > 720 ? 200 / 2 ** z : 0; flyTo([x + off, y], z); }
+}
+
+// ================= GPU renderer: deck.gl (WebGL) =================
+// Every view is a handful of deck.gl layers over static arrays built once per layout. Pan/zoom/spread are uniform
+// changes, picking happens on the GPU, and highlight colours fade on the GPU via attribute transitions.
+const host = $('#deck');
+let W, H, VIEW, deckgl, vs = {target: [0, 0, 0], zoom: 0}, stretch = 1, widened = false;
+const rgb = h => { const n = parseInt(h.slice(1), 16); return [n >> 16, n >> 8 & 255, n & 255]; };
+const CC = cu => rgb(cu.c[dark ? 0 : 1]);
+const INK = () => dark ? [235, 229, 216] : [42, 33, 24];
+const BG = () => rgb(bgc());
+const SC = () => 2 ** vs.zoom;
+const SX = x => (x - vs.target[0]) * SC() + W / 2, SY = y => (y - vs.target[1]) * SC() + H / 2;
+const zs = () => 2 ** (vs.zoom * .28);                 // strokes thicken gently as you zoom in
+let fkey = 0;                                           // bumped on every focus change so colour accessors re-run
+const A = (n, on, off) => !focusing() ? on : lit(n) ? Math.min(255, on * 1.5) : off;   // alpha 0–255
+const FADE = {getColor: 260, getFillColor: 260, getLineColor: 260};
+const ADD = {blend: true, blendColorOperation: 'add', blendColorSrcFactor: 'src-alpha', blendColorDstFactor: 'one',
+             blendAlphaOperation: 'add', blendAlphaSrcFactor: 'one', blendAlphaDstFactor: 'one-minus-src-alpha'};
+const blendP = () => dark ? ADD : {};
+function redraw() {
+  if (!VIEW) return;
+  if (VIEW.map) { overlay?.setProps({layers: constellation.layers()}); return; }
+  deckgl?.setProps({layers: VIEW.layers()}); ticks(VIEW); axis(VIEW);
+}
+function refocus() { fkey++; redraw(); legendState(); }
+function initDeck() {
+  deckgl = new deck.Deck({
+    parent: host, views: new deck.OrthographicView({id: 'o', flipY: true}),
+    initialViewState: {o: home()}, controller: {scrollZoom: {speed: .012, smooth: true}, inertia: 300, doubleClickZoom: true},
+    pickingRadius: 8, useDevicePixels: true,
+    onViewStateChange: ({viewState}) => { vs = viewState; redraw(); },
+    onHover: ({object, x, y}) => { const n = object?.n ?? null; if (n !== hov) { hov = n; refocus(); } showTip(n, x, y); },
+    onClick: ({object}) => object ? select(object.n) : closePanel(),
+    getCursor: ({isDragging, isHovering}) => isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab',
+  });
+}
+// deck ignores an initialViewState equal to the last one given, even if the user has moved since; a tiny alternating nudge makes every reset land
+let nudge = 0;
+const home = () => ({target: [W / 2, H / 2, 0], zoom: (++nudge % 2) * 1e-6, minZoom: -1, maxZoom: 9});
+function flyTo(target, zoom, ms = 700) {
+  deckgl.setProps({initialViewState: {o: {...home(), target: [...target, 0], zoom, transitionDuration: ms,
+    transitionInterpolator: new deck.LinearInterpolator(['target', 'zoom']), transitionEasing: t => 1 - (1 - t) ** 3}}});
+}
+// pinned year rail: stays put while you zoom; roundest years win, never closer than 28px
+const axisEl = $('#axis');
+function pool(el, n) { while (el.children.length < n) el.appendChild(document.createElement('span')); [...el.children].forEach((s, i) => s.style.display = i < n ? '' : 'none'); return el.children; }
+let TICKS = [];
+function ticks(v) {
+  TICKS = []; if (!v.y) return;
+  const ys = [];
+  for (const step of [500, 100, 50, 25, 10, 5, 1]) for (let y = Math.ceil(Y0 / step) * step; y <= 2025; y += step) {
+    const sy = SY(v.y(y)); if (sy < 74 || sy > H - 24 || ys.some(t => Math.abs(t - sy) < 28)) continue;
+    if (!TICKS.some(t => t[0] === y)) { TICKS.push([y, sy, v.y(y)]); ys.push(sy); }
+  }
+}
+function axis(v) {
+  axisEl.style.opacity = v.y ? 1 : 0; if (!v.y) return;
+  const sp = pool(axisEl, TICKS.length); TICKS.forEach(([y, sy], i) => { sp[i].textContent = y; sp[i].style.top = (sy - 64) + 'px'; });
+}
+const grid = () => new deck.LineLayer({id: 'grid', data: TICKS, getSourcePosition: t => [-1e7, t[2]], getTargetPosition: t => [1e7, t[2]],
+  getColor: [...INK(), 16], getWidth: 1, updateTriggers: {getColor: dark}});
+// names appear when their branch is wide enough on screen; a greedy screen-space pass drops collisions
+// (pan-invariant, so it only reruns per zoom step, focus change or relayout)
+let labelCache = {};
+function labelLayer(v, mm) {
+  const s = person(), key = [Math.round(vs.zoom * 4), fkey, v.name, v.gen, stretch].join('|');
+  if (labelCache.key !== key) {
+    const k = SC(), f = focusing(), cand = v.dots.filter(d => d.n === s || (f ? lit(d.n) && v.wide(d.n) > 20 : v.wide(d.n) > 70))
+      .sort((a, b) => (b.n === s) - (a.n === s) || (focusing() ? lit(b.n) - lit(a.n) : 0) || a.n.g - b.n.g);
+    const cell = new Map(), out = [], hit = (gx, gy, r) => (cell.get(gx + ',' + gy) || []).some(q => r[0] < q[2] && q[0] < r[2] && r[1] < q[3] && q[1] < r[3]);
+    for (const d of cand) {
+      const [sx, sy] = v.sat(d.n), x = sx * k + 9, y = sy * k, r = [x, y - 8, x + (d.n.p.given.length + d.n.p.sur.length + 1) * 6.6 + 6, y + 8];
+      const gx0 = Math.floor(r[0] / 120), gx1 = Math.floor(r[2] / 120), gy0 = Math.floor(r[1] / 24), gy1 = Math.floor(r[3] / 24);
+      let clash = false;
+      for (let gx = gx0; gx <= gx1 && !clash; gx++) for (let gy = gy0; gy <= gy1 && !clash; gy++) clash = hit(gx, gy, r);
+      if (clash) continue;
+      out.push(d); for (let gx = gx0; gx <= gx1; gx++) for (let gy = gy0; gy <= gy1; gy++) { const c = gx + ',' + gy; cell.has(c) ? cell.get(c).push(r) : cell.set(c, [r]); }
+    }
+    labelCache = {key, data: out};
+  }
+  return new deck.TextLayer({id: 'labels', data: labelCache.data, getPosition: d => [d.x, d.y], getText: d => d.n.p.given + ' ' + d.n.p.sur,
+    getSize: 12, sizeUnits: 'pixels', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, characterSet: 'auto',
+    getTextAnchor: 'start', getAlignmentBaseline: 'center', getPixelOffset: [9, 0], modelMatrix: mm,
+    getColor: d => [...INK(), !focusing() || lit(d.n) ? 235 : 60], fontSettings: {sdf: true, fontSize: 64, buffer: 8}, outlineWidth: 5, outlineColor: [...BG(), 255],
+    updateTriggers: {getColor: [fkey, dark], outlineColor: dark}});
+}
+function dotLayers(v, r, mm) {
+  const z = zs(), est = d => d.n.p.by == null;
+  return [
+    new deck.ScatterplotLayer({id: 'dup', data: v.dups, getPosition: d => [d.x, d.y], filled: false, stroked: true, radiusUnits: 'pixels', getRadius: r + 2.8,
+      radiusScale: z, lineWidthUnits: 'pixels', getLineWidth: .9, getLineColor: d => [...CC(d.n.p.cu), A(d.n, 190, 18)], modelMatrix: mm,
+      updateTriggers: {getLineColor: [fkey, dark]}, transitions: FADE}),
+    new deck.ScatterplotLayer({id: 'dots', data: v.dots, getPosition: d => [d.x, d.y], radiusUnits: 'pixels', getRadius: r, radiusScale: z,
+      stroked: true, lineWidthUnits: 'pixels', lineWidthScale: z, getLineWidth: d => est(d) ? 1.2 : 1.4, modelMatrix: mm,
+      getFillColor: d => est(d) ? [...BG(), A(d.n, 255, 30)] : [...CC(d.n.p.cu), A(d.n, 255, 30)],
+      getLineColor: d => est(d) ? [...CC(d.n.p.cu), A(d.n, 255, 30)] : [...BG(), A(d.n, 255, 30)],
+      pickable: true, updateTriggers: {getFillColor: [fkey, dark], getLineColor: [fkey, dark]}, transitions: FADE}),
+  ];
+}
+const youLayer = (v, mm) => new deck.ScatterplotLayer({id: 'you', data: [v.at(ROOT)], getPosition: d => d, radiusUnits: 'pixels', getRadius: 5, modelMatrix: mm,
+  getFillColor: INK(), stroked: true, lineWidthUnits: 'pixels', getLineWidth: 2, getLineColor: BG(), updateTriggers: {getFillColor: dark, getLineColor: dark}});
+const left = () => innerWidth < 720 ? 58 : 80;
+// cubic with vertical tangents at both ends, sampled densely enough to stay smooth even when spread wide and zoomed in
+function bez(x0, y0, x1, y1) {
+  const k = Math.min(160, Math.max(10, Math.ceil(Math.hypot((x1 - x0) * 6, y1 - y0) / 2.5))), m = (y0 + y1) / 2, out = new Array(k + 1);
+  for (let i = 0; i <= k; i++) { const t = i / k, u = 1 - t, a = u * u * (u + 3 * t), b = t * t * (3 * u + t); out[i] = [a * x0 + b * x1, u ** 3 * y0 + 3 * u * t * m + t ** 3 * y1]; }
+  return out;
+}
+const dotsOf = v => { v.dots = N.map(n => { const [x, y] = v.at(n); return {n, x, y}; }); v.dups = v.dots.filter(d => d.n.dup); };
+
+// frame a person's whole branch (them and everyone above them)
+function fit(n) {
+  let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (let i = n.pre; i <= n.post; i++) { const [x, y] = VIEW.sat(N[i]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  const pw = innerWidth > 720 && panel.classList.contains('open') ? 420 : 0;
+  const z = Math.max(-1, Math.min(6, Math.log2(Math.min((W - pw - 140) / Math.max(1, x1 - x0), (H - 160) / Math.max(1, y1 - y0)))));
+  flyTo([(x0 + x1) / 2 + pw / 2 / 2 ** z, (y0 + y1) / 2], z);
+}
+// ---- give a branch more room: leaves under it get a bigger share, and everything glides there
+function widen(n) {
+  if (n) { const s = n.hi - n.lo + 1, f = Math.max(1, .6 * (leafN - s) / (s * .4)); place(l => l.lo >= n.lo && l.lo <= n.hi ? f : 1); }
+  else place(() => 1);
+  widened = !!n; $('#even').hidden = !widened;
+  const from = N.map(n => n.un), t0 = performance.now(), v = VIEW;
+  const step = t => {
+    const u = Math.min(1, (t - t0) / 650), e = 1 - (1 - u) ** 3;
+    N.forEach((n, i) => n.un = from[i] + (n.un1 - from[i]) * e);
+    v.layout(); v.gen = (v.gen || 0) + 1; redraw();
+    if (u < 1) requestAnimationFrame(step); else { if (sel) openPanel(sel); fit(n || ROOT); }
+  };
+  requestAnimationFrame(step);
+}
+
+// ================= views =================
+const tributaries = {
+  name: 'Tributaries', bg: ['#0b0c0f', '#f3eee5'], spread: true,
+  cap: 'Time runs down the page. Each ancestor is a strand that begins at their birth and flows into their child’s, braiding into you at the bottom. Strand weight shows how much known ancestry rides on it. Hollow dots are estimated birth years; ringed dots appear more than once in your tree. Use Spread, or open anyone and give their branch room.',
+  layout() {
+    const top = 84, bot = H - 64, l = left();
+    this.y = v => top + tn(v) * (bot - top); this.l = l;
+    this.X = n => l + (W - l - 24) * n.un;
+    dotsOf(this);
+    this.strands = N.filter(n => n.c).map(n => { const [x0, y0] = this.at(n), [x1, y1] = this.at(n.c); return {n, w: Math.log2(n.n), path: bez(x0, y0, x1, y1)}; });
+  },
+  at(n) { return [this.X(n), this.y(BY(n.p))]; },
+  sat(n) { const [x, y] = this.at(n); return [W / 2 + (x - W / 2) * stretch, y]; },   // with spread applied
+  wide(n) { return (n.hi - n.lo + 1) * (W - this.l - 24) / leafN * stretch * SC() * (widened ? 2 : 1); },
+  mm() { return [stretch, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, W / 2 * (1 - stretch), 0, 0, 1]; },
+  layers() {
+    const mm = this.mm();
+    return [grid(),
+      new deck.PathLayer({id: 'strands', data: this.strands, getPath: d => d.path, getWidth: d => .5 + d.w * .42, widthUnits: 'pixels', widthScale: zs(),
+        capRounded: true, jointRounded: true, getColor: d => [...CC(d.n.p.cu), A(d.n, 150, 14)], pickable: true, parameters: blendP(), modelMatrix: mm,
+        updateTriggers: {getColor: [fkey, dark]}, transitions: FADE}),
+      ...dotLayers(this, 1.9, mm), youLayer(this, mm), labelLayer(this, mm)];
+  },
+};
+
+const rings = {
+  name: 'Tree Rings', bg: ['#0b0c0f', '#f3eee5'],
+  cap: 'A cross-section of the family. Today is the heart and each ring is a decade, with the centuries drawn firmer. Every ancestor is a strand that grows inward from their birth ring to their child’s, coloured by region and weighted by the ancestry it carries.',
+  layout() {
+    const ox = W / 2, oy = H / 2 + 26, Rm = Math.min(W - 120, H - 150) * .5;
+    this.r = v => 14 + Rm * (1 - tn(v)); this.o = [ox, oy];
+    this.p = (v, th) => { const rr = this.r(v); return [ox + Math.cos(th) * rr, oy + Math.sin(th) * rr]; };
+    this.th = n => n.un * Math.PI * 2 - Math.PI / 2;
+    const ring = v => { const out = []; for (let i = 0; i <= 360; i++) { const th = i / 360 * Math.PI * 2, rr = this.r(v) * (1 + .006 * Math.sin(th * 3 + v * .05)); out.push([ox + Math.cos(th) * rr, oy + Math.sin(th) * rr]); } return out; };
+    if (!this.rings || this.rings.Y0 !== Y0 || this.rings.W !== W || this.rings.H !== H) {
+      this.rings = []; for (let v = 2020; v >= Y0; v -= 10) this.rings.push({c: v % 100 === 0, path: ring(v)}); Object.assign(this.rings, {Y0, W, H});
+    }
+    dotsOf(this);
+    // polar strand: radius moves steadily from parent's ring to child's, angle eases across so it leaves and arrives radially
+    this.strands = N.filter(n => n.c).map(n => {
+      const t0 = this.th(n), t1 = this.th(n.c), r0 = this.r(BY(n.p)), r1 = this.r(BY(n.c.p));
+      const k = Math.min(160, Math.max(10, Math.ceil((Math.abs(t1 - t0) * Math.max(r0, r1) * 6 + Math.abs(r1 - r0)) / 2.5))), path = new Array(k + 1);
+      for (let i = 0; i <= k; i++) { const t = i / k, s = t * t * (3 - 2 * t), th = t0 + (t1 - t0) * s, rr = r0 + (r1 - r0) * t; path[i] = [this.o[0] + Math.cos(th) * rr, this.o[1] + Math.sin(th) * rr]; }
+      return {n, w: Math.log2(n.n), path};
+    });
+  },
+  at(n) { return this.p(BY(n.p), this.th(n)); },
+  sat(n) { return this.at(n); },
+  wide(n) { return (n.hi - n.lo + 1) / leafN * 2 * Math.PI * this.r(BY(n.p)) * SC() * (widened ? 2 : 1); },
+  layers() {
+    const ink = INK();
+    return [
+      new deck.PathLayer({id: 'rings', data: this.rings, getPath: d => d.path, getWidth: d => d.c ? 1.1 : .7, widthUnits: 'pixels',
+        getColor: d => [...ink, d.c ? 80 : 26], updateTriggers: {getColor: dark}}),
+      new deck.PathLayer({id: 'strands', data: this.strands, getPath: d => d.path, getWidth: d => .6 + d.w * .38, widthUnits: 'pixels', widthScale: zs(),
+        capRounded: true, jointRounded: true, getColor: d => [...CC(d.n.p.cu), A(d.n, 175, 14)], pickable: true, parameters: blendP(),
+        updateTriggers: {getColor: [fkey, dark]}, transitions: FADE}),
+      ...dotLayers(this, 1.9), youLayer(this), labelLayer(this), this.pills()];
+  },
+  pills() {   // year labels on a radial scale along the first visible spoke (straight up when possible)
+    const out = [], placed = [];
+    for (const step of [500, 100, 50, 25, 10, 5]) for (let v = Math.ceil(Y0 / step) * step; v <= 2020; v += step) {
+      if (out.some(o => o.v === v)) continue;
+      let best = null;
+      for (const deg of [-90, -60, -120, -30, -150, 0, 180, 30, 150, 60, 120, 90]) {   // first visible spoke, so labels line up radially
+        const [wx, wy] = this.p(v, deg * Math.PI / 180), x = SX(wx), y = SY(wy);
+        if (x > 80 && x < W - 60 && y > 80 && y < H - 70) { best = {v, pos: [wx, wy], sx: x, sy: y}; break; }
+      }
+      if (!best || placed.some(([x, y]) => Math.abs(x - best.sx) < 54 && Math.abs(y - best.sy) < 24)) continue;
+      placed.push([best.sx, best.sy]); out.push(best);
+    }
+    return new deck.TextLayer({id: 'pills', data: out, getPosition: d => d.pos, getText: d => String(d.v), getSize: 13, sizeUnits: 'pixels',
+      fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 500, getColor: [...INK(), 235], background: true, getBackgroundColor: dark ? [22, 23, 28, 240] : [251, 248, 242, 245],
+      getBorderColor: [...INK(), 70], getBorderWidth: 1, backgroundPadding: [8, 4], backgroundBorderRadius: 10, characterSet: '0123456789-',
+      updateTriggers: {getColor: dark, getBackgroundColor: dark, getBorderColor: dark}});
+  },
+};
+
+// ---- constellation: MapLibre basemap + deck.gl overlay; time is a GPU filter, so scrubbing costs nothing
+let map, overlay, T = 2026, playing = false, lastT = 0;
+const TIME = new deck.DataFilterExtension({filterSize: 1});
+const constellation = {name: 'Constellation', map: true,
+  cap: 'Every ancestor is a star at their birthplace, and arcs join each birth to their child’s. Hollow stars have no place of their own and share a parent’s or child’s; people with nothing known nearby are left off. Press play to sweep through the centuries; zoom in for real towns; click a star for the full story.',
+  build() {
+    const ns = N.filter(n => !n.dup && n.p.loc);
+    this.stars = ns.map(n => ({n, pos: n.p.loc, v: BY(n.p), inf: n.p.how === 'inferred'}));
+    this.arcs = N.filter(n => n.c && n.p.loc && n.c.p.loc).map(n => {
+      const [x0, y0] = n.p.loc, [x1, y1] = n.c.p.loc, d = Math.hypot(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2 + d * .18, path = [];
+      const k = Math.max(4, Math.min(48, Math.ceil(d * 2)));
+      for (let i = 0; i <= k; i++) { const t = i / k; path.push([(1 - t) ** 2 * x0 + 2 * t * (1 - t) * mx + t * t * x1, (1 - t) ** 2 * y0 + 2 * t * (1 - t) * my + t * t * y1]); }
+      return {n, path, v: BY(n.c.p)};
+    });
+    const xs = ns.map(n => n.p.loc[0]).sort((a, b) => a - b), ys = ns.map(n => n.p.loc[1]).sort((a, b) => a - b), q = (a, f) => a[Math.floor(f * (a.length - 1))];
+    this.bounds = [[q(xs, .01), q(ys, .01)], [q(xs, .99), q(ys, .99)]];   // ignore far outliers when fitting
+  },
+  layers() {
+    const fr = {filterRange: [Y0 - 1, T], filterSoftRange: [Y0 - 1, T - 12], extensions: [TIME], getFilterValue: d => d.v};
+    return [
+      new deck.PathLayer({id: 'arcs', data: this.arcs, getPath: d => d.path, getWidth: 1, widthUnits: 'pixels',
+        getColor: d => [...CC(d.n.p.cu), A(d.n, dark ? 70 : 90, 8)], parameters: blendP(), ...fr, updateTriggers: {getColor: [fkey, dark]}, transitions: FADE}),
+      new deck.ScatterplotLayer({id: 'glow', data: this.stars, getPosition: d => d.pos, radiusUnits: 'pixels', getRadius: d => d.inf ? 6 : 10,
+        getFillColor: d => [...CC(d.n.p.cu), A(d.n, d.inf ? 26 : 46, 4)], parameters: blendP(), ...fr, updateTriggers: {getFillColor: [fkey, dark]}, transitions: FADE}),
+      new deck.ScatterplotLayer({id: 'core', data: this.stars, getPosition: d => d.pos, radiusUnits: 'pixels', getRadius: d => d.inf ? 2.4 : 2.6,
+        stroked: true, lineWidthUnits: 'pixels', getLineWidth: d => d.inf ? 1.2 : .8, pickable: true, ...fr,
+        getFillColor: d => d.inf ? [...BG(), A(d.n, 200, 20)] : dark ? [255, 248, 236, A(d.n, 255, 30)] : [...CC(d.n.p.cu), A(d.n, 255, 30)],
+        getLineColor: d => [...CC(d.n.p.cu), A(d.n, 255, 30)], updateTriggers: {getFillColor: [fkey, dark], getLineColor: [fkey, dark]}, transitions: FADE}),
+    ];
+  },
+};
+const styleURL = () => `https://basemaps.cartocdn.com/gl/${dark ? 'dark-matter' : 'positron'}-gl-style/style.json`;
+function setT(t) { T = t; $('#yr').value = Math.round(t); $('#yrl').textContent = Math.round(t); redraw(); }
+function initMap() {
+  constellation.build();
+  map = new maplibregl.Map({container: 'map', style: styleURL(), bounds: constellation.bounds, fitBoundsOptions: {padding: 70}, attributionControl: {compact: true}});
+  overlay = new deck.MapboxOverlay({interleaved: false, layers: constellation.layers(), pickingRadius: 10,
+    onHover: ({object, x, y}) => { const n = object?.n ?? null; if (n !== hov) { hov = n; refocus(); } showTip(n, x, y); },
+    onClick: ({object}) => object ? select(object.n) : closePanel(),
+    getCursor: ({isHovering}) => isHovering ? 'pointer' : 'grab'});
+  map.addControl(overlay);
+}
+function play(on) {
+  playing = on; $('#play').innerHTML = on ? ICON.pause : ICON.play;
+  if (on) { if (T >= 2026) setT(Y0); lastT = performance.now(); requestAnimationFrame(tick); }
+}
+function tick(now) {
+  if (!playing) return;
+  const t = Math.min(2026, T + (now - lastT) / 1000 * 30); lastT = now; setT(t);
+  t < 2026 ? requestAnimationFrame(tick) : play(false);
+}
+$('#play').onclick = () => play(!playing);
+$('#yr').oninput = e => { play(false); setT(+e.target.value); };
+
+// ---- spread: a horizontal stretch applied on the GPU (modelMatrix), keeping the middle of the screen in place
+function setSpread(v) {
+  const s1 = 2 ** (v * 4); $('#spread').value = v;
+  if (!VIEW?.spread) { stretch = s1; return; }
+  const tx = W / 2 + (vs.target[0] - W / 2) * s1 / stretch; stretch = s1;
+  vs = {...home(), target: [tx, vs.target[1], 0], zoom: vs.zoom};
+  deckgl.setProps({initialViewState: {o: vs}});
+  redraw();
+}
+$('#spread').oninput = e => setSpread(+e.target.value);
+$('#even').onclick = () => widen(null);
+
+// ================= shell =================
+const VIEWS = [tributaries, constellation, rings];
+const nav = $('.views'), capEl = $('#cap'), mapEl = $('#map'), legendEl = $('#legend');
+nav.innerHTML = VIEWS.map((v, i) => `<button data-i="${i}">${v.name}</button>`).join('');
+nav.onclick = e => e.target.dataset.i && show(VIEWS[+e.target.dataset.i]);
+try { if (localStorage.getItem('lineage-cap') === 'hide' || innerWidth < 720) capEl.classList.add('hide'); } catch {}
+$('#info').onclick = () => { capEl.classList.toggle('hide'); try { localStorage.setItem('lineage-cap', capEl.classList.contains('hide') ? 'hide' : 'show'); } catch {} };
+$('#home').onclick = () => VIEW.map ? map.fitBounds(constellation.bounds, {padding: 70}) : flyTo(home().target.slice(0, 2), 0);
+$('#theme').onclick = () => { dark = !dark; try { localStorage.setItem('lineage-theme', dark ? 'dark' : 'light'); } catch {} applyTheme(); if (map) map.setStyle(styleURL()); };
+// legend: hover (or tap) a region to light everyone born there
+function legend() {
+  const seen = new Set(N.map(n => n.p.cu));
+  legendEl.innerHTML = [...REGIONS, UNK].filter(c => seen.has(c)).map(c => `<button data-k="${c.k}" style="--c:${c.c[dark ? 0 : 1]}">${c.k}</button>`).join('');
+  legendState();
+}
+// controls sit just above the legend, whatever height it wraps to
+new ResizeObserver(() => document.documentElement.style.setProperty('--lh', legendEl.offsetHeight + 'px')).observe(legendEl);
+const cuByK = k => [...REGIONS, UNK].find(c => c.k === k);
+function legendState() { legendEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', hlCu?.k === b.dataset.k || pinCu?.k === b.dataset.k)); }
+legendEl.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const c = cuByK(e.target.dataset?.k); if (c && c !== hlCu) { hlCu = c; refocus(); } });
+legendEl.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && hlCu !== pinCu) { hlCu = pinCu; refocus(); } });
+legendEl.addEventListener('click', e => {
+  if (innerWidth < 720 && !legendEl.classList.contains('open')) { legendEl.classList.add('open'); return; }
+  const c = cuByK(e.target.dataset?.k); if (!c) return;
+  pinCu = pinCu === c ? null : c; hlCu = pinCu; refocus();
+});
+function applyTheme() {
+  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+  document.documentElement.style.setProperty('--bg', VIEW.map ? (dark ? '#0e0e10' : '#fafaf8') : VIEW.bg[dark ? 0 : 1]);
+  $('#themeIcon').innerHTML = dark ? ICON.sun : ICON.moon;
+  legend(); redraw();
+}
+function show(v) {
+  const swap = () => {
+    VIEW = v; hov = null; showTip(null); play(false); labelCache = {};
+    nav.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', VIEWS[i] === v));
+    capEl.textContent = v.cap; host.hidden = !!v.map; mapEl.hidden = !v.map;
+    $('#time').style.display = v.map ? 'flex' : 'none';
+    $('#ctrl').style.display = v.spread ? 'flex' : 'none';
+    axisEl.style.opacity = v.y ? 1 : 0;
+    if (v.map) { if (!map) { initMap(); setTimeout(() => play(true), 1500); } else map.resize(); }
+    else {
+      v.layout(); vs = home();
+      if (!deckgl) initDeck(); else deckgl.setProps({initialViewState: {o: home()}});
+      if (sel) select(sel, true);
+    }
+    applyTheme(); requestAnimationFrame(() => { host.classList.remove('fade'); mapEl.classList.remove('fade'); });
+  };
+  if (!VIEW || VIEW === v) return swap();
+  host.classList.add('fade'); mapEl.classList.add('fade'); setTimeout(swap, 220);
+}
+addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (e.key >= '1' && e.key <= String(VIEWS.length)) show(VIEWS[+e.key - 1]);
+  if (e.key === '0') $('#home').click();
+  if (e.key === 't') $('#theme').click();
+  if (e.key === '[' || e.key === ']') setSpread(Math.min(1, Math.max(0, +$('#spread').value + (e.key === ']' ? .08 : -.08))));
+  if (e.key === ' ' && VIEW.map) { e.preventDefault(); play(!playing); }
+  if (e.key === 'Escape') { closePanel(); if (hlCu || pinCu) { hlCu = pinCu = null; refocus(); } }
+  if (sel && ['ArrowUp', 'ArrowDown'].includes(e.key)) {   // walk the line: up = father (shift: mother), down = child
+    e.preventDefault(); const n = e.key === 'ArrowDown' ? sel.c : (e.shiftKey ? sel.m || sel.f : sel.f || sel.m); if (n) select(n, true);
+  }
+});
+function size() { W = innerWidth; H = innerHeight; }
+addEventListener('resize', () => { size(); if (VIEW && !VIEW.map) { VIEW.layout(); labelCache = {}; vs = home(); deckgl?.setProps({initialViewState: {o: vs}}); redraw(); } });
+size();
+Promise.all([load(), document.fonts.ready]).then(() => { $('#msg').remove(); show(tributaries); })
+  .catch(err => { $('#msg').textContent = 'Couldn’t load tree.json. Run pull.py first. (' + err.message + ')'; console.error(err); });
+</script>
+</body></html>
