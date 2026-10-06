@@ -5,12 +5,15 @@ keep only a candidate whose county/state/country agree with the other parts ("Ba
 "Plymouth Colony" -> Massachusetts). If the most specific part can't be verified we try the next part ("Hull with
 Appleton, Cheshire" -> "Cheshire"), recording how far we had to fall back. A candidate is never accepted on a bare
 name match when the rest of the name disagrees, and the country must be one the name implies.
-Entries: [lon, lat, cut, country_code, matched_parts]; [] = verified miss. Resumable; older unverified entries are redone."""
+Entries: [lon, lat, cut, country_code, matched_parts]; [] = verified miss. Every result is saved to lineage.db the moment it's
+found (store.py), and places.json is exported for the viewer as it goes; older unverified entries are redone."""
 import json, os, re, sys, time, unicodedata, urllib.request, urllib.parse
+import store
 from collections import Counter
 sys.stdout.reconfigure(encoding='utf-8')
 HERE = os.path.dirname(os.path.abspath(__file__))
 PF = os.path.join(HERE, 'places.json')
+export = lambda: json.dump(store.places(), open(PF, 'w', encoding='utf-8'), ensure_ascii=False)
 UA = {'User-Agent': 'Lineage genealogy viewer'}
 
 CC = [  # keyword in a part of the name -> plausible modern country codes
@@ -58,6 +61,7 @@ def norm(s):
     s = re.sub(r'\b(county|province|provincia|provinz|departement|department|region|regione|shire|of|the|de|du|la|le|di|von|im|in|landkreis|kreis|arrondissement|city|town|parish|township|borough|district)\b', ' ', s)
     return re.sub(r'[^a-z ]', ' ', s).split()
 def key(s): return ' '.join(norm(s))
+ALIAS = {key(k): v for k, v in ALIAS.items()}   # look up aliases by the same normalised key
 def agree(part, cand):   # does one part of the place name agree with this candidate's admin areas?
     fields = [key(cand.get(f) or '') for f in ('admin1', 'admin2', 'admin3', 'admin4', 'country')]
     fields = [f for f in fields if f]
@@ -94,6 +98,16 @@ def search(name, codes):
     cache[k] = [r for r in res if not codes or r.get('country_code', '').lower() in codes]
     return cache[k]
 
+def region(name, codes):   # Nominatim knows states and countries; one polite request per such name
+    p = {'q': name, 'format': 'json', 'limit': 5, 'countrycodes': ','.join(sorted(codes))}
+    try: res = json.load(urllib.request.urlopen(urllib.request.Request('https://nominatim.openstreetmap.org/search?' + urllib.parse.urlencode(p), headers=UA), timeout=60))
+    except Exception: res = []
+    time.sleep(1.1)
+    for r in res:
+        if r.get('addresstype') in ('state', 'country', 'region', 'province', 'county') or r.get('type') == 'administrative':
+            return [round(float(r['lon']), 4), round(float(r['lat']), 4)]
+    return None
+
 def geocode(loc):
     parts = [x.strip() for x in loc.split(',') if x.strip()]
     codes = expect(loc)
@@ -109,24 +123,44 @@ def geocode(loc):
         scored = sorted(((score(r), r.get('population') or 0, r) for r in cands), key=lambda t: (-t[0], -t[1]))
         best, pop, r = scored[0]
         if not ctx and not codes: continue                 # a lone word with no country: don't guess
+        if not ctx:   # a bare region name ("Pennsylvania", "England"): only a region-level match will do
+            cands = [c for c in cands if re.match(r'ADM|PCL|RGN|ISL|AREA', c.get('feature_code') or '')]
+            if not cands and codes:
+                reg = region(name, codes)
+                if reg: return reg + [cut, '', 0]
+        if not cands: continue
+        scored = sorted(((score(r), r.get('population') or 0, r) for r in cands), key=lambda t: (-t[0], -t[1]))
+        best, pop, r = scored[0]
         strong = any(key(c) not in BROAD for c in ctx[:-1]) or bool(extra)   # nearer, specific parts exist, so one of them must agree
         if ctx and best < (1 if strong else .4) and not (codes and len(cands) == 1 and not strong): continue
         return [round(r['longitude'], 4), round(r['latitude'], 4), cut, r.get('country_code', '').lower(), round(best, 1)]
+    k = key(parts[-1]) if parts else ''   # only a historical region is left ("Nouvelle-France", "Massachusetts Bay Colony"): use its modern region
+    if k in ALIAS and codes:
+        reg = region(ALIAS[k].split('|')[0], codes)
+        if reg: return reg + [len(parts) - 1, '', 0]
     return []
 
 if __name__ == '__main__':
-    tree = json.load(open(os.path.join(HERE, 'tree.json'), encoding='utf-8'))['people']
-    places = json.load(open(PF, encoding='utf-8')) if os.path.exists(PF) else {}
+    T = json.load(open(os.path.join(HERE, 'tree.json'), encoding='utf-8')); tree = T['people']
+    gen, q = {str(T['root']): 0}, [str(T['root'])]   # nearest generations first, so close family is placed right away
+    while q:
+        i = q.pop(0)
+        for k in ('Father', 'Mother'):
+            j = str(tree[i].get(k) or 0)
+            if j in tree and j not in gen: gen[j] = gen[i] + 1; q.append(j)
+    near = {}
+    store.migrate()
     locs = Counter()
     for p in tree.values():
         for k in ('BirthLocation', 'DeathLocation'):
-            if (p.get(k) or '').strip(): locs[p[k].strip()] += 2 if k == 'BirthLocation' else 1
+            if (p.get(k) or '').strip(): locs[p[k].strip()] += 2 if k == 'BirthLocation' else 1; near[p[k].strip()] = min(near.get(p[k].strip(), 99), gen.get(str(p['Id']), 99))
         for m in p.get('Marriages') or []:
             if (m.get('place') or '').strip(): locs[m['place'].strip()] += 1
-    todo = [l for l, _ in locs.most_common() if places.get(l) is None or (places[l] and len(places[l]) < 5)]
+    def stale(l): v = store.place(l); return v is None or 0 < len(v) < 5
+    todo = sorted((l for l in locs if stale(l)), key=lambda l: (near.get(l, 99) // 4, -locs[l]))
     print('places', len(locs), 'to geocode', len(todo))
     for n, loc in enumerate(todo):
-        places[loc] = geocode(loc)
-        if n % 100 == 0: json.dump(places, open(PF, 'w', encoding='utf-8'), ensure_ascii=False); print('geocoded', n, '/', len(todo))
-    json.dump(places, open(PF, 'w', encoding='utf-8'), ensure_ascii=False)
-    print('done', len(places), 'hits', sum(1 for v in places.values() if v))
+        store.put_place(loc, geocode(loc))
+        if n % 25 == 0: export(); print('geocoded', n, '/', len(todo))
+    export()
+    print('done', sum(1 for v in store.places().values() if v), 'hits')

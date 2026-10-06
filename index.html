@@ -22,30 +22,37 @@ nav>*{pointer-events:auto}
 .views button.on{background:var(--ink);color:var(--bg)}
 .tools{margin-left:auto;display:flex;gap:6px}
 .tools button,.round{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--ink);cursor:pointer;padding:0}
-#axis{position:fixed;z-index:4;pointer-events:none;border-radius:12px;overflow:hidden;transition:opacity .25s;left:12px;top:100px;bottom:12px;width:50px}
+#axis{position:fixed;z-index:4;pointer-events:none;border-radius:12px;overflow:hidden;transition:opacity .25s;left:12px;top:64px;bottom:12px;width:50px}
 #axis span{position:absolute;right:9px;transform:translateY(-50%);font:11px var(--sans);color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
 #axis span::after{content:'';position:absolute;right:-9px;top:50%;width:5px;border-top:1px solid var(--dim);opacity:.6}
-#tags{position:fixed;top:60px;left:74px;right:12px;z-index:6;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;pointer-events:none}
-#tags button{pointer-events:auto;flex:none;display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;font:500 12px var(--sans);color:var(--dim);cursor:pointer;border:1px solid var(--line);background:var(--panel);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:background .15s,color .15s}
+body.rail #dock{left:74px;width:min(440px,calc(100vw - 482px))}
+#dock{position:fixed;left:12px;bottom:12px;z-index:5;width:min(440px,calc(100vw - 420px));min-width:280px;border-radius:18px;padding:10px 12px 12px;font:12px var(--sans);color:var(--dim);transition:transform .35s cubic-bezier(.2,.8,.2,1)}
+#dock header{display:flex;align-items:center;gap:8px;font:500 13px var(--sans);color:var(--ink);cursor:pointer;user-select:none}
+#dock header small{font:12px var(--sans);color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#dock header svg{width:16px;height:16px;margin-left:auto;transition:transform .25s;flex:none}
+#dock.shut header svg{transform:rotate(180deg)}
+#dock .rows{display:grid;gap:10px;margin-top:10px}
+#dock.shut .rows{display:none}
+#dock .row>span{display:block;margin:0 0 5px 2px}
+#legend,#tags{display:flex;flex-wrap:wrap;gap:4px}
+#legend button,#tags button{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;padding:4px 10px;border-radius:999px;border:1px solid var(--line);color:var(--dim);transition:background .15s,color .15s,border-color .15s}
+#legend button::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--c);flex:none}
+#legend button:hover,#tags button:hover{color:var(--ink);border-color:var(--dim)}
+#legend button.on,#tags button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 #tags button small{font:11px var(--sans);opacity:.7;font-variant-numeric:tabular-nums}
-#tags button:hover,#tags button.on{color:var(--ink);background:var(--line)}
-#tags button.on{background:var(--ink);color:var(--bg)}
-#legend{position:fixed;right:12px;bottom:12px;z-index:5;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 4px;max-width:min(62vw,640px);padding:5px 8px;border-radius:18px;font:12px var(--sans);color:var(--dim)}
-#legend button{all:unset;cursor:default;white-space:nowrap;padding:3px 8px;border-radius:999px;transition:background .15s,color .15s}
-#legend button:hover,#legend button.on{background:var(--line);color:var(--ink)}
-#legend button::before{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--c);margin-right:6px;box-shadow:0 0 0 2px var(--bg)}
-#ctrl{position:fixed;right:12px;bottom:calc(var(--lh,40px) + 20px);z-index:5;display:flex;align-items:center;gap:10px;padding:5px 6px 5px 14px;border-radius:999px;font:500 12px var(--sans);color:var(--dim);transition:opacity .25s}
+#ctrl{position:fixed;right:12px;bottom:12px;z-index:5;display:flex;align-items:center;gap:10px;padding:5px 6px 5px 14px;border-radius:999px;font:500 12px var(--sans);color:var(--dim);transition:opacity .25s}
 #ctrl input{width:min(26vw,200px);accent-color:var(--ink)}
 .pill{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;font:500 12px var(--sans);color:var(--ink);background:var(--line)}
 .pill[hidden]{display:none}
 .pill:hover{background:var(--ink);color:var(--bg)}
 .pill svg{width:14px;height:14px}
-#legend,#ctrl,#time{transition:right .4s cubic-bezier(.2,.8,.2,1),opacity .25s}
-body.po #legend,body.po #ctrl,body.po #time{right:calc(min(400px,100vw - 24px) + 24px)}
+#ctrl,#time{transition:right .4s cubic-bezier(.2,.8,.2,1),opacity .25s}
+body.po #ctrl,body.po #time{right:calc(min(400px,100vw - 24px) + 24px)}
 body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)}
-#cap{position:fixed;left:74px;bottom:12px;z-index:5;max-width:31em;padding:12px 16px;border-radius:14px;font-size:15px;line-height:1.45;color:var(--dim);transition:opacity .25s}
+#cap{position:fixed;top:60px;right:12px;z-index:9;max-width:min(26em,calc(100vw - 24px));padding:12px 16px;border-radius:14px;font-size:15px;line-height:1.45;color:var(--ink);transition:opacity .2s,transform .2s}
+#cap.hide{transform:translateY(-6px)}
 #cap.hide{opacity:0;pointer-events:none}
-#time{position:fixed;right:12px;bottom:calc(var(--lh,40px) + 20px);z-index:5;display:none;align-items:center;gap:12px;padding:5px 16px 5px 5px;border-radius:999px}
+#time{position:fixed;right:12px;bottom:12px;z-index:5;display:none;align-items:center;gap:12px;padding:5px 16px 5px 5px;border-radius:999px}
 #play{width:36px;height:36px;border-radius:50%;border:0;background:var(--ink);color:var(--bg);display:grid;place-items:center;cursor:pointer}
 #play svg{width:16px;height:16px;fill:currentColor;stroke:none}
 #time input{width:min(34vw,340px);accent-color:var(--ink)}
@@ -79,13 +86,11 @@ body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)
 .maplibregl-ctrl-attrib{font-family:var(--sans);font-size:10px}
 @media (max-width:720px){
   nav{top:8px;left:8px;right:8px;gap:6px} .views button{padding:7px 11px;font-size:12.5px} .tools button{width:34px;height:34px}
-  #axis{left:6px;top:96px;width:42px;bottom:96px} #axis span{right:7px}
-  #tags{top:52px;left:8px;right:8px}
-  #legend{left:8px;right:8px;bottom:8px;max-width:none;justify-content:flex-start;max-height:31px;overflow:hidden}
-  #legend.open{max-height:none}
-  #ctrl,#time{left:8px;right:8px;bottom:calc(var(--lh,31px) + 14px)} #ctrl input,#time input{flex:1;width:auto}
-  #cap{left:8px;right:8px;bottom:96px;max-width:none}
-  body.po #legend,body.po #ctrl,body.po #time{right:8px;opacity:0;pointer-events:none}
+  #axis{left:6px;top:56px;width:42px;bottom:calc(var(--dh,44px) + 64px)} #axis span{right:7px}
+  #dock,body.rail #dock{left:8px;right:8px;bottom:8px;width:auto;min-width:0;max-height:60vh;overflow:auto}
+  #ctrl,#time{left:8px;right:8px;bottom:calc(var(--dh,44px) + 14px)} #ctrl input,#time input{flex:1;width:auto}
+  #cap{top:52px;left:8px;right:8px}
+  body.po #dock,body.po #ctrl,body.po #time{opacity:0;pointer-events:none}
   #panel{top:auto;left:8px;right:8px;bottom:8px;width:auto;height:72vh;transform:translateY(calc(100% + 16px))}
 }
 </style></head>
@@ -98,11 +103,11 @@ body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)
     <button id="home" class="glass" title="Fit (0)"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></button>
     <button id="theme" class="glass" title="Light / dark (t)"><svg class="i" viewBox="0 0 24 24" id="themeIcon"></svg></button>
   </div></nav>
-<div id="tags"></div>
-<div id="cap" class="glass"></div>
+<div id="cap" class="glass hide"></div>
 <div id="ctrl" class="glass"><span>Spread</span><input id="spread" type="range" min="0" max="1" step="0.001" value="0" title="Widen horizontally ([ and ])"><button id="even" class="pill" hidden>Even out</button></div>
 <div id="time" class="glass"><button id="play" title="Play (space)"></button><input id="yr" type="range" max="2026" step="1"><span id="yrl"></span></div>
-<div id="legend" class="glass"></div>
+<section id="dock" class="glass"><header><span>Filters</span><small id="dockNow"></small><svg class="i" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></header>
+  <div class="rows"><div class="row"><span>Born in</span><div id="legend"></div></div><div class="row"><span>Highlight</span><div id="tags"></div></div></div></section>
 <aside id="panel"></aside>
 <div id="tip" class="glass"></div>
 <div id="msg">Loading your family…</div>
@@ -193,6 +198,8 @@ async function load() {
     const b = ok(p.BirthLocation), d = ok(p.DeathLocation), m = (p.Marriages || []).map(x => ok(x.place)).find(Boolean);
     const hasBirth = !!(p.BirthLocation || '').trim();
     p.loc = hasBirth ? b : d || m; p.how = !p.loc ? (hasBirth ? 'pending' : null) : hasBirth ? 'birth' : d ? 'death' : 'marriage';
+    const g = places[((hasBirth ? p.BirthLocation : d ? p.DeathLocation : '') || '').trim()];
+    p.approx = !!(p.loc && g && (g[2] > 0 || !g[3]));   // only a broader area matched (a county, a region, a country)
     if (p.loc) p.loc = jit(p.loc, p.Id, .04);
     p.cu = culture(p.BirthLocation) || culture(p.DeathLocation) || (b && regionAt(...b)) || (d && regionAt(...d)) || UNK;
   }
@@ -300,7 +307,14 @@ function openPanel(n) {
     ${p.hasBio ? `<div class="bio" data-id="${p.Id}"><p class="meta">Loading…</p></div>` : ''}
     <a class="wt" href="https://www.wikitree.com/wiki/${encodeURIComponent(p.Name)}" target="_blank" rel="noopener">Open on WikiTree ${ICON.ext}</a>`;
   panel.classList.add('open'); document.body.classList.add('po'); panel.scrollTop = 0;
-  if (p.hasBio) bio(p.Id).then(h => { const el = panel.querySelector(`.bio[data-id="${p.Id}"]`); if (el) el.innerHTML = cleanBio(h); });
+  if (p.hasBio) bio(p.Id).then(b => {   // a translated bio shows in English, with the original a click away
+    const el = panel.querySelector(`.bio[data-id="${p.Id}"]`); if (!el) return;
+    if (typeof b === 'string') { el.innerHTML = cleanBio(b); return; }
+    const name = {fr: 'French', de: 'German', it: 'Italian'}[b.lang] || 'the original';
+    const render = orig => { el.innerHTML = `<p class="meta"><button class="pill" data-flip>${orig ? 'Show English translation' : 'Show original (' + name + ')'}</button></p>` + cleanBio(orig ? b.o : b.en);
+      el.querySelector('[data-flip]').onclick = () => render(!orig); };
+    render(false);
+  });
   panel.querySelector('.x').onclick = closePanel;
   panel.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => select(N[+b.dataset.pre], true));
   panel.querySelector('[data-act=widen]')?.addEventListener('click', () => widen(n));
@@ -364,7 +378,7 @@ function ticks(v) {
   TICKS = []; if (!v.y) return;
   const ys = [];
   for (const step of [500, 100, 50, 25, 10, 5, 1]) for (let y = Math.ceil(Y0 / step) * step; y <= 2025; y += step) {
-    const sy = SY(v.y(y)); if (sy < 112 || sy > H - 24 || ys.some(t => Math.abs(t - sy) < 28)) continue;
+    const sy = SY(v.y(y)); if (sy < 76 || sy > H - 24 || ys.some(t => Math.abs(t - sy) < 28)) continue;
     if (!TICKS.some(t => t[0] === y)) { TICKS.push([y, sy, v.y(y)]); ys.push(sy); }
   }
 }
@@ -528,10 +542,10 @@ const rings = {
 let map, overlay, T = 2026, playing = false, lastT = 0;
 const TIME = new deck.DataFilterExtension({filterSize: 1});
 const constellation = {name: 'Constellation', map: true,
-  cap: 'Every ancestor is a star at their birthplace, and arcs join each birth to their child’s. Hollow stars have no place of their own and share a parent’s or child’s; people with nothing known nearby are left off. Press play to sweep through the centuries; zoom in for real towns; click a star for the full story.',
+  cap: 'Every ancestor is a star at their birthplace, and arcs join each birth to their child’s. Hollow stars are approximate: only a region is known, or they share a parent’s or child’s place; people with nothing known nearby are left off. Press play to sweep through the centuries; zoom in for real towns; click a star for the full story.',
   build() {
     const ns = N.filter(n => !n.dup && n.p.loc);
-    this.stars = ns.map(n => ({n, pos: n.p.loc, v: BY(n.p), inf: n.p.how === 'inferred'}));
+    this.stars = ns.map(n => ({n, pos: n.p.loc, v: BY(n.p), inf: n.p.how === 'inferred' || n.p.approx}));
     this.arcs = N.filter(n => n.c && n.p.loc && n.c.p.loc).map(n => {
       const [x0, y0] = n.p.loc, [x1, y1] = n.c.p.loc, d = Math.hypot(x1 - x0, y1 - y0), mx = (x0 + x1) / 2, my = (y0 + y1) / 2 + d * .18, path = [];
       const k = Math.max(4, Math.min(48, Math.ceil(d * 2)));
@@ -595,8 +609,8 @@ const VIEWS = [tributaries, constellation, rings];
 const nav = $('.views'), capEl = $('#cap'), mapEl = $('#map'), legendEl = $('#legend');
 nav.innerHTML = VIEWS.map((v, i) => `<button data-i="${i}">${v.name}</button>`).join('');
 nav.onclick = e => e.target.dataset.i && show(VIEWS[+e.target.dataset.i]);
-try { if (localStorage.getItem('lineage-cap') === 'hide' || innerWidth < 720) capEl.classList.add('hide'); } catch {}
-$('#info').onclick = () => { capEl.classList.toggle('hide'); try { localStorage.setItem('lineage-cap', capEl.classList.contains('hide') ? 'hide' : 'show'); } catch {} };
+$('#info').onclick = e => { e.stopPropagation(); capEl.classList.toggle('hide'); };
+addEventListener('pointerdown', e => { if (!capEl.contains(e.target) && !e.target.closest('#info')) capEl.classList.add('hide'); });
 $('#home').onclick = () => VIEW.map ? map.fitBounds(constellation.bounds, {padding: 70}) : flyTo(home().target.slice(0, 2), 0);
 $('#theme').onclick = () => { dark = !dark; try { localStorage.setItem('lineage-theme', dark ? 'dark' : 'light'); } catch {} applyTheme(); if (map) map.setStyle(styleURL()); };
 // legend: hover (or tap) a region to light everyone born there
@@ -606,15 +620,20 @@ function legend() {
   legendState();
 }
 // controls sit just above the legend, whatever height it wraps to
-new ResizeObserver(() => document.documentElement.style.setProperty('--lh', legendEl.offsetHeight + 'px')).observe(legendEl);
+const dockEl = $('#dock');
+new ResizeObserver(() => document.documentElement.style.setProperty('--dh', dockEl.offsetHeight + 'px')).observe(dockEl);
+try { if (localStorage.getItem('lineage-dock') === 'shut' || (innerWidth < 720 && localStorage.getItem('lineage-dock') !== 'open')) dockEl.classList.add('shut'); } catch {}
+dockEl.querySelector('header').onclick = () => { dockEl.classList.toggle('shut'); try { localStorage.setItem('lineage-dock', dockEl.classList.contains('shut') ? 'shut' : 'open'); } catch {} };
 const tagsEl = $('#tags');
 const groupByK = k => [...REGIONS, UNK, ...TAGS].find(c => c.k === k);
-function legendState() { for (const b of [...legendEl.querySelectorAll('button'), ...tagsEl.querySelectorAll('button')]) b.classList.toggle('on', hlCu?.k === b.dataset.k || pinCu?.k === b.dataset.k); }
+function legendState() {
+  for (const b of [...legendEl.querySelectorAll('button'), ...tagsEl.querySelectorAll('button')]) b.classList.toggle('on', hlCu?.k === b.dataset.k || pinCu?.k === b.dataset.k);
+  $('#dockNow').textContent = pinCu ? '· ' + pinCu.k : '';   // what's pinned stays visible even when the dock is shut
+}
 function pinnable(el) {   // hover previews a group, click pins it (click again or Esc to release)
   el.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const c = groupByK(e.target.closest('button')?.dataset.k); if (c && c !== hlCu) { hlCu = c; refocus(); } });
   el.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && hlCu !== pinCu) { hlCu = pinCu; refocus(); } });
   el.addEventListener('click', e => {
-    if (el === legendEl && innerWidth < 720 && !legendEl.classList.contains('open')) { legendEl.classList.add('open'); return; }
     const c = groupByK(e.target.closest('button')?.dataset.k); if (!c) return;
     pinCu = pinCu === c ? null : c; hlCu = pinCu; refocus();
   });
@@ -638,7 +657,7 @@ function show(v) {
     capEl.textContent = v.cap; host.hidden = !!v.map; mapEl.hidden = !v.map;
     $('#time').style.display = v.map ? 'flex' : 'none';
     $('#ctrl').style.display = v.spread ? 'flex' : 'none';
-    axisEl.style.opacity = v.y ? 1 : 0;
+    axisEl.style.opacity = v.y ? 1 : 0; document.body.classList.toggle('rail', !!v.y);
     if (v.map) { if (!map) { initMap(); setTimeout(() => play(true), 1500); } else map.resize(); }
     else {
       v.layout(); vs = home();
