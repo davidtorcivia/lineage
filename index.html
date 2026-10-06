@@ -75,6 +75,7 @@ body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)
 #panel .kids li{display:flex;justify-content:space-between;gap:12px;padding:5px 0;border-bottom:1px solid var(--line)}
 #panel .kids li.line{font-weight:500}
 #panel .kids small{color:var(--dim);font-variant-numeric:tabular-nums}
+#panel .lang{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 4px;padding:10px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font:13px var(--sans);color:var(--dim)}
 #panel .bio{font-size:15.5px;line-height:1.55;overflow-wrap:anywhere}
 #panel .bio h2,#panel .bio h3{font-size:17px;font-weight:600;margin:20px 0 6px}
 #panel .bio a{color:inherit;text-decoration-color:var(--dim);text-underline-offset:3px}
@@ -313,7 +314,7 @@ function openPanel(n) {
     const el = panel.querySelector(`.bio[data-id="${p.Id}"]`); if (!el) return;
     if (typeof b === 'string') { el.innerHTML = cleanBio(b); return; }
     const name = {fr: 'French', de: 'German', it: 'Italian'}[b.lang] || 'the original';
-    const render = orig => { el.innerHTML = `<p class="meta"><button class="pill" data-flip>${orig ? 'Show English translation' : 'Show original (' + name + ')'}</button></p>` + cleanBio(orig ? b.o : b.en);
+    const render = orig => { el.innerHTML = `<div class="lang"><span>${orig ? 'Original ' + name : 'Translated from ' + name}</span><button class="pill" data-flip>${orig ? 'Show English' : 'Show original'}</button></div>` + cleanBio(orig ? b.o : b.en);
       el.querySelector('[data-flip]').onclick = () => render(!orig); };
     render(false);
   });
