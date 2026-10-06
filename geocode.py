@@ -68,10 +68,11 @@ def norm(s):
     s = re.sub(r'\b(county|province|provincia|provinz|departement|department|region|regione|shire|of|the|de|du|la|le|di|von|im|in|landkreis|kreis|arrondissement|city|town|parish|township|borough|district)\b', ' ', s)
     return re.sub(r'[^a-z ]', ' ', s).split()
 def key(s): return ' '.join(norm(s))
-ALIAS = {key(k): v for k, v in ALIAS.items()}   # look up aliases by the same normalised key
+ALIAS = {key(k): v for k, v in ALIAS.items() if key(k) != key(v)}   # same normalised key as lookups; drop no-op aliases ("province of new york" -> new york) that would hide real towns
 def agree(part, cand):   # does one part of the place name agree with this candidate's admin areas?
     own = key(cand.get('name') or '')   # a town's own name in its admin3/admin4 ("City of Plymouth") is not evidence
-    fields = [f for f in (key(cand.get(f) or '') for f in ('admin1', 'admin2', 'admin3', 'admin4', 'country')) if f and f != own]
+    fields = [key(cand.get(f) or '') for f in ('admin1', 'admin2', 'country')] + [f for f in (key(cand.get(f) or '') for f in ('admin3', 'admin4')) if f != own]
+    fields = [f for f in fields if f]   # (a state may share the city's name, as New York does)
     k = key(part)
     if not k: return False
     # a historical name is matched only through its modern equivalent ("Plymouth Colony" -> Massachusetts, never "Plymouth")
@@ -129,6 +130,11 @@ def geocode(loc):
         ctx = parts[cut + 1:] + extra
         cands = search(re.sub(r'\(.*?\)', '', name).strip(), codes)
         if not cands: continue
+        # the name is itself a state or country ("Pennsylvania, United States"): it means the region, not a village called that
+        # (only when nothing but a country follows: "New York, New York, United States" is the city)
+        if all(key(c) in BROAD for c in parts[cut + 1:]) and any(key(c.get('admin1') or '') == k or key(c.get('country') or '') == k for c in cands):
+            reg = region(name, codes)
+            if reg: return reg + [cut, '', 0]
         # the last part is usually the country: agreeing with it is weak evidence; any nearer part is strong evidence
         def score(r): return sum((.4 if key(c) in BROAD or (i == len(ctx) - 1 and not extra) else 1) for i, c in enumerate(ctx) if c and agree(c, r))
         exact = lambda r: key(r.get('name') or '') == key(name)   # Eastham beats Easthampton when both fit
@@ -151,7 +157,24 @@ def geocode(loc):
         if reg: return reg + [len(parts) - 1, '', 0]
     return []
 
+CASES = {   # every place that has gone wrong before, with where it really is (lon, lat): python geocode.py --test
+    'Plymouth, Plymouth Colony': (-70.67, 41.96), 'Eastham, Plymouth Colony': (-69.97, 41.83), 'Eastham, Barnstable, Plymouth Colony': (-69.97, 41.83),
+    'Pennsylvania, United States': (-77.7, 41.0), 'New York, New York, United States': (-74.0, 40.71), 'Québec, Nouvelle-France': (-71.21, 46.81),
+    'Kaskaskia, Pays des Illinois, Nouvelle-France': (-89.91, 37.92), 'Le Mans, Maine, France': (0.2, 48.0), 'York, Maine': (-70.61, 43.17),
+    'Portland, Cumberland, Maine, United States': (-70.26, 43.66), 'Tusa, Messina, Sicilia, Italy': (14.24, 37.98), 'Kcynia, Posen, Prussia': (17.49, 52.99),
+    'Appleton, Outagamie, Wisconsin, United States': (-88.42, 44.26), 'Birten, Moers, Rhineland, Prussia, German Empire': (6.48, 51.63),
+    'Crépy-en-Valois, Isle-de-France, France': (2.89, 49.23), 'Acre, Kingdom of Jerusalem': (35.08, 32.93), 'Atlanta, Fulton, Georgia, United States': (-84.39, 33.75),
+}
+def selftest():
+    bad = []
+    for loc, (x, y) in CASES.items():
+        g = geocode(loc)
+        if not g or abs(g[0] - x) > .6 or abs(g[1] - y) > .6: bad.append((loc, g))
+    for b in bad: print('WRONG', *b)
+    print(f'{len(CASES) - len(bad)}/{len(CASES)} known places correct'); sys.exit(1 if bad else 0)
+
 if __name__ == '__main__':
+    if '--test' in sys.argv: selftest()
     T = json.load(open(os.path.join(HERE, 'tree.json'), encoding='utf-8')); tree = T['people']
     gen, q = {str(T['root']): 0}, [str(T['root'])]   # nearest generations first, so close family is placed right away
     while q:
