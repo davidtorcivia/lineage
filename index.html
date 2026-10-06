@@ -22,9 +22,14 @@ nav>*{pointer-events:auto}
 .views button.on{background:var(--ink);color:var(--bg)}
 .tools{margin-left:auto;display:flex;gap:6px}
 .tools button,.round{width:38px;height:38px;border-radius:50%;display:grid;place-items:center;color:var(--ink);cursor:pointer;padding:0}
-#axis{position:fixed;z-index:4;pointer-events:none;border-radius:12px;overflow:hidden;transition:opacity .25s;left:12px;top:64px;bottom:12px;width:50px}
+#axis{position:fixed;z-index:4;pointer-events:none;border-radius:12px;overflow:hidden;transition:opacity .25s;left:12px;top:100px;bottom:12px;width:50px}
 #axis span{position:absolute;right:9px;transform:translateY(-50%);font:11px var(--sans);color:var(--dim);white-space:nowrap;font-variant-numeric:tabular-nums}
 #axis span::after{content:'';position:absolute;right:-9px;top:50%;width:5px;border-top:1px solid var(--dim);opacity:.6}
+#tags{position:fixed;top:60px;left:74px;right:12px;z-index:6;display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;pointer-events:none}
+#tags button{pointer-events:auto;flex:none;display:inline-flex;align-items:center;gap:7px;padding:6px 12px;border-radius:999px;font:500 12px var(--sans);color:var(--dim);cursor:pointer;border:1px solid var(--line);background:var(--panel);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);transition:background .15s,color .15s}
+#tags button small{font:11px var(--sans);opacity:.7;font-variant-numeric:tabular-nums}
+#tags button:hover,#tags button.on{color:var(--ink);background:var(--line)}
+#tags button.on{background:var(--ink);color:var(--bg)}
 #legend{position:fixed;right:12px;bottom:12px;z-index:5;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:2px 4px;max-width:min(62vw,640px);padding:5px 8px;border-radius:18px;font:12px var(--sans);color:var(--dim)}
 #legend button{all:unset;cursor:default;white-space:nowrap;padding:3px 8px;border-radius:999px;transition:background .15s,color .15s}
 #legend button:hover,#legend button.on{background:var(--line);color:var(--ink)}
@@ -74,7 +79,8 @@ body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)
 .maplibregl-ctrl-attrib{font-family:var(--sans);font-size:10px}
 @media (max-width:720px){
   nav{top:8px;left:8px;right:8px;gap:6px} .views button{padding:7px 11px;font-size:12.5px} .tools button{width:34px;height:34px}
-  #axis{left:6px;top:56px;width:42px;bottom:96px} #axis span{right:7px}
+  #axis{left:6px;top:96px;width:42px;bottom:96px} #axis span{right:7px}
+  #tags{top:52px;left:8px;right:8px}
   #legend{left:8px;right:8px;bottom:8px;max-width:none;justify-content:flex-start;max-height:31px;overflow:hidden}
   #legend.open{max-height:none}
   #ctrl,#time{left:8px;right:8px;bottom:calc(var(--lh,31px) + 14px)} #ctrl input,#time input{flex:1;width:auto}
@@ -92,6 +98,7 @@ body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)
     <button id="home" class="glass" title="Fit (0)"><svg class="i" viewBox="0 0 24 24"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg></button>
     <button id="theme" class="glass" title="Light / dark (t)"><svg class="i" viewBox="0 0 24 24" id="themeIcon"></svg></button>
   </div></nav>
+<div id="tags"></div>
 <div id="cap" class="glass"></div>
 <div id="ctrl" class="glass"><span>Spread</span><input id="spread" type="range" min="0" max="1" step="0.001" value="0" title="Widen horizontally ([ and ])"><button id="even" class="pill" hidden>Even out</button></div>
 <div id="time" class="glass"><button id="play" title="Play (space)"></button><input id="yr" type="range" max="2026" step="1"><span id="yrl"></span></div>
@@ -125,6 +132,7 @@ const EN = R('English', '#4a8bf0', '#2563c4', /england|angleterre|northumbria|we
 const FR = R('French & Québécois', '#b48cf2', '#8a5ad6', /france|francia|francie|francs|frankish|fr(ä|a)nkisch|carolingi|austrasi|neustria|burgond|burgund|bourgogne|provence|toulouse|gascogne|gasco(ñ|n)a|gascony|aquitaine|savoie|limoges|armorica|cornouaille|anjou|poitou|champagne|qu(é|e)bec|nouvelle|new france|acadi|bas-canada|lower canada|lorraine|alsace|normandie|normandy|bretagne|brittany|perche|canada|gen(è|e)ve/i);
 const EA = R('Eastern European', '#e0609f', '#b83f84', /poland|polska|wielkopolska|kiev|kyiv|ukrain|russia|\brus\b|rus'|novgorod|polotsk|hungar|magyar|bohemia|(č|c)echy|morav|pannonia|croatia|serbia|bulgaria|lithuania|central asia|dentumogeria|yakutia|[Ѐ-ӿ]/i);
 const UNK = R('Unknown', '#57544e', '#b8af9f', /$^/);
+UNK.test = p => p.cu === UNK;
 // where each region can plausibly be (lon0, lat0, lon1, lat1); a geocode outside these is a wrong match
 const BOX = new Map([[IT, [[-10, 28, 45, 48]]], [IB, [[-10, 35, 4.5, 44.5]]], [GE, [[1.5, 44, 26, 56]]], [AM, [[-170, 15, -50, 72]]],
   [CE, [[-11, 49.8, -1, 61]]], [SCN, [[4, 53.5, 32, 72], [-25, 62.5, -12, 67.5], [-4, 58, 0, 61]]], [EN, [[-7, 49, 2, 56.5]]],
@@ -138,6 +146,17 @@ function plausible(loc, ll, era) {
   return ll;
 }
 const REGIONS = [IT, IB, GE, AM, CE, SCN, EN, FR, EA];
+for (const c of [...REGIONS]) c.test = p => p.cu === c;
+// highlights from WikiTree categories and profile stickers
+const TAG = (k, re, tpl) => ({k, test: p => (p.Cats || []).some(c => re.test(c)) || (p.Tpl || []).some(t => tpl.test(t))});
+const TAGS = [
+  TAG('Notables', /notables|featured_royalty|^saints$/i, /notables/i),
+  TAG('Royalty & nobility', /royal|kings?_|kingdom_of|nobility|barony|earls_of|dukes|counts_of|rulers|high_kings|aristocrat|princes/i, /euroaristo|aristocrat|royals|succession/i),
+  TAG('Magna Carta', /magna_carta|surety_barons/i, /magna carta/i),
+  TAG('Crusaders & soldiers', /crusade|war\b|wars\b|_war_|military|army|navy|soldier|veteran|militia|regiment|patriot|loyalist|knights/i, /military|war\b|revolution|soldier|veteran|navy|army|crusade/i),
+  TAG('Migrants & settlers', /immigra|emigra|migrants|great_migration|filles_|pioneers|settlers|founders/i, /migrating ancestor|great migration|acadian|filles|pioneer|immigra/i),
+  TAG('Mayflower', /mayflower/i, /mayflower/i),
+];
 function culture(loc) {   // first segment that names a known place wins ("Edinburgh, Scotland, United Kingdom" -> Scottish)
   if (!loc) return null;
   for (const s of loc.split(',').map(x => x.trim())) for (const c of REGIONS) if (c.re.test(s)) return c;
@@ -239,7 +258,7 @@ let sel = null, hov = null, hlCu = null, pinCu = null;
 const person = () => hov || sel;
 const focusing = () => !!(hov || sel || hlCu);
 function lit(n) {
-  if (hlCu && !hov) return n.p.cu === hlCu;
+  if (hlCu && !hov) return hlCu.test(n.p);
   const s = person(); if (!s) return true;
   return (s.pre <= n.pre && n.pre <= s.post) || (n.pre <= s.pre && s.pre <= n.post) || n.p === s.p;
 }
@@ -273,6 +292,7 @@ function openPanel(n) {
     <h2>${p.given} ${p.MiddleName ? p.MiddleName + ' ' : ''}${p.sur}</h2>
     <p class="meta">${life(p)}${p.byE && p.by == null ? ' (birth year estimated)' : ''}${places ? '<br>' + places : ''}</p>
     <p class="rel">${rel(n)}${n.dup ? ' (also appears elsewhere in your tree)' : ''}</p>
+    ${TAGS.some(t => t.test(p)) ? `<div class="acts">${TAGS.filter(t => t.test(p)).map(t => `<button class="pill" data-tag="${t.k}">${t.k}</button>`).join('')}</div>` : ''}
     ${n.g > 1 ? `<ol class="path">${chain(n).map(c => `<li><button data-pre="${c.pre}">${c.p.given}</button></li>`).join('')}</ol>` : ''}
     ${!VIEW.map && n.c && n.hi > n.lo ? `<div class="acts"><button class="pill" data-act="widen">${ICON.widen}Give this branch room</button>${widened ? `<button class="pill" data-act="even">${ICON.even}Even out</button>` : ''}</div>` : ''}
     ${p.Kids?.length ? `<h3>Children</h3><ul class="kids">${p.Kids.map(k => `<li class="${k.Id === lineKid ? 'line' : ''}"><span>${k.FirstName || ''} ${k.LastNameAtBirth || ''}</span><small>${yr(k.BirthDate) ?? ''}</small></li>`).join('')}</ul>` : ''}
@@ -284,6 +304,7 @@ function openPanel(n) {
   panel.querySelector('.x').onclick = closePanel;
   panel.querySelectorAll('[data-pre]').forEach(b => b.onclick = () => select(N[+b.dataset.pre], true));
   panel.querySelector('[data-act=widen]')?.addEventListener('click', () => widen(n));
+  panel.querySelectorAll('[data-tag]').forEach(b => b.onclick = () => { pinCu = hlCu = groupByK(b.dataset.tag); closePanel(); refocus(); });
   panel.querySelector('[data-act=even]')?.addEventListener('click', () => widen(null));
 }
 function closePanel() { panel.classList.remove('open'); document.body.classList.remove('po'); if (sel) { sel = null; refocus(); } }
@@ -343,13 +364,13 @@ function ticks(v) {
   TICKS = []; if (!v.y) return;
   const ys = [];
   for (const step of [500, 100, 50, 25, 10, 5, 1]) for (let y = Math.ceil(Y0 / step) * step; y <= 2025; y += step) {
-    const sy = SY(v.y(y)); if (sy < 74 || sy > H - 24 || ys.some(t => Math.abs(t - sy) < 28)) continue;
+    const sy = SY(v.y(y)); if (sy < 112 || sy > H - 24 || ys.some(t => Math.abs(t - sy) < 28)) continue;
     if (!TICKS.some(t => t[0] === y)) { TICKS.push([y, sy, v.y(y)]); ys.push(sy); }
   }
 }
 function axis(v) {
   axisEl.style.opacity = v.y ? 1 : 0; if (!v.y) return;
-  const sp = pool(axisEl, TICKS.length); TICKS.forEach(([y, sy], i) => { sp[i].textContent = y; sp[i].style.top = (sy - 64) + 'px'; });
+  const sp = pool(axisEl, TICKS.length); TICKS.forEach(([y, sy], i) => { sp[i].textContent = y; sp[i].style.top = (sy - axisEl.getBoundingClientRect().top) + 'px'; });
 }
 const grid = () => new deck.LineLayer({id: 'grid', data: TICKS, getSourcePosition: t => [-1e7, t[2]], getTargetPosition: t => [1e7, t[2]],
   getColor: [...INK(), 16], getWidth: 1, updateTriggers: {getColor: dark}});
@@ -586,20 +607,29 @@ function legend() {
 }
 // controls sit just above the legend, whatever height it wraps to
 new ResizeObserver(() => document.documentElement.style.setProperty('--lh', legendEl.offsetHeight + 'px')).observe(legendEl);
-const cuByK = k => [...REGIONS, UNK].find(c => c.k === k);
-function legendState() { legendEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', hlCu?.k === b.dataset.k || pinCu?.k === b.dataset.k)); }
-legendEl.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const c = cuByK(e.target.dataset?.k); if (c && c !== hlCu) { hlCu = c; refocus(); } });
-legendEl.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && hlCu !== pinCu) { hlCu = pinCu; refocus(); } });
-legendEl.addEventListener('click', e => {
-  if (innerWidth < 720 && !legendEl.classList.contains('open')) { legendEl.classList.add('open'); return; }
-  const c = cuByK(e.target.dataset?.k); if (!c) return;
-  pinCu = pinCu === c ? null : c; hlCu = pinCu; refocus();
-});
+const tagsEl = $('#tags');
+const groupByK = k => [...REGIONS, UNK, ...TAGS].find(c => c.k === k);
+function legendState() { for (const b of [...legendEl.querySelectorAll('button'), ...tagsEl.querySelectorAll('button')]) b.classList.toggle('on', hlCu?.k === b.dataset.k || pinCu?.k === b.dataset.k); }
+function pinnable(el) {   // hover previews a group, click pins it (click again or Esc to release)
+  el.addEventListener('pointerover', e => { if (e.pointerType !== 'mouse') return; const c = groupByK(e.target.closest('button')?.dataset.k); if (c && c !== hlCu) { hlCu = c; refocus(); } });
+  el.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && hlCu !== pinCu) { hlCu = pinCu; refocus(); } });
+  el.addEventListener('click', e => {
+    if (el === legendEl && innerWidth < 720 && !legendEl.classList.contains('open')) { legendEl.classList.add('open'); return; }
+    const c = groupByK(e.target.closest('button')?.dataset.k); if (!c) return;
+    pinCu = pinCu === c ? null : c; hlCu = pinCu; refocus();
+  });
+}
+pinnable(legendEl); pinnable(tagsEl);
+function tags() {
+  const seen = new Set(), cnt = new Map(TAGS.map(t => [t, 0]));
+  for (const n of N) if (!seen.has(n.p)) { seen.add(n.p); for (const t of TAGS) if (t.test(n.p)) cnt.set(t, cnt.get(t) + 1); }
+  tagsEl.innerHTML = TAGS.filter(t => cnt.get(t)).map(t => `<button data-k="${t.k}">${t.k}<small>${cnt.get(t).toLocaleString()}</small></button>`).join('');
+}
 function applyTheme() {
   document.documentElement.dataset.theme = dark ? 'dark' : 'light';
   document.documentElement.style.setProperty('--bg', VIEW.map ? (dark ? '#0e0e10' : '#fafaf8') : VIEW.bg[dark ? 0 : 1]);
   $('#themeIcon').innerHTML = dark ? ICON.sun : ICON.moon;
-  legend(); redraw();
+  legend(); tags(); legendState(); redraw();
 }
 function show(v) {
   const swap = () => {
