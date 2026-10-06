@@ -203,6 +203,7 @@ async function load() {
     p.loc = hasBirth ? b : d || m; p.how = !p.loc ? (hasBirth ? 'pending' : null) : hasBirth ? 'birth' : d ? 'death' : 'marriage';
     const g = places[((hasBirth ? p.BirthLocation : d ? p.DeathLocation : '') || '').trim()];
     p.approx = !!(p.loc && g && (g[2] > 0 || !g[3]));   // only a broader area matched (a county, a region, a country)
+    p.areaR = g && !g[3] ? 900 : 200;                     // how far (km) that area reaches: a state or country vs a county
     if (p.loc) p.loc = jit(p.loc, p.Id, .04);
     p.cu = culture(p.BirthLocation) || culture(p.DeathLocation) || (b && regionAt(...b)) || (d && regionAt(...d)) || UNK;
   }
@@ -225,6 +226,22 @@ async function load() {
   for (const n of N) {   // children come before their parents in N, so estimates and places flow up the tree
     const p = n.p;
     if (p.by == null && p.byE == null) p.byE = n.c ? BY(n.c.p) - (p.Gender === 'Female' ? 27 : 31) : p.dy ? p.dy - 55 : 1990;
+  }
+  // only an area is known (a state, a region, a country): pull them toward their closest relatives with exact places in
+  // that area, weight halving with each generation between them; failing that, toward where the tree's people there cluster
+  const km = (a, b) => Math.hypot((a[0] - b[0]) * 111 * Math.cos(a[1] * Math.PI / 180), (a[1] - b[1]) * 111);
+  const sure = q => q.loc && !q.approx && q.how !== 'inferred';
+  const exact = N.filter(n => !n.dup && sure(n.p)).map(n => n.p.loc);
+  for (const n of N) {
+    const p = n.p; if (n.dup || !p.approx || !p.loc) continue;
+    const c0 = p.loc, pts = [], take = (m, d) => { if (m && sure(m.p) && km(c0, m.p.loc) < p.areaR) pts.push([m.p.loc, 2 ** -d]); };
+    for (let m = n.c, d = 1; m && d <= 4; m = m.c, d++) take(m, d);                     // down the line toward you
+    const up = (m, d) => { if (!m || d > 4) return; take(m, d); up(m.f, d + 1); up(m.m, d + 1); };
+    up(n.f, 1); up(n.m, 1);                                                               // and up through their parents
+    if (!pts.length) for (const q of exact) if (km(c0, q) < p.areaR) pts.push([q, 1]);
+    if (!pts.length) continue;
+    const w = pts.reduce((s, [, x]) => s + x, 0);
+    p.loc = jit([pts.reduce((s, [q, x]) => s + q[0] * x, 0) / w, pts.reduce((s, [q, x]) => s + q[1] * x, 0) / w], p.Id, .12);
   }
   // no place of their own: share the place of an adjacent parent or child who has one; otherwise leave them off the map
   for (const n of N) {
