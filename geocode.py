@@ -70,11 +70,12 @@ def norm(s):
 def key(s): return ' '.join(norm(s))
 ALIAS = {key(k): v for k, v in ALIAS.items()}   # look up aliases by the same normalised key
 def agree(part, cand):   # does one part of the place name agree with this candidate's admin areas?
-    fields = [key(cand.get(f) or '') for f in ('admin1', 'admin2', 'admin3', 'admin4', 'country')]
-    fields = [f for f in fields if f]
+    own = key(cand.get('name') or '')   # a town's own name in its admin3/admin4 ("City of Plymouth") is not evidence
+    fields = [f for f in (key(cand.get(f) or '') for f in ('admin1', 'admin2', 'admin3', 'admin4', 'country')) if f and f != own]
     k = key(part)
     if not k: return False
-    targets = [k] + (ALIAS.get(k, '') or ALIAS.get(part.strip().lower(), '')).split('|')
+    # a historical name is matched only through its modern equivalent ("Plymouth Colony" -> Massachusetts, never "Plymouth")
+    targets = ALIAS[k].split('|') if k in ALIAS else [k]
     for t in filter(None, targets):
         for f in fields:
             if t in f or f in t or (len(t) >= 5 and len(f) >= 5 and t[:5] == f[:5]): return True
@@ -130,8 +131,9 @@ def geocode(loc):
         if not cands: continue
         # the last part is usually the country: agreeing with it is weak evidence; any nearer part is strong evidence
         def score(r): return sum((.4 if key(c) in BROAD or (i == len(ctx) - 1 and not extra) else 1) for i, c in enumerate(ctx) if c and agree(c, r))
-        scored = sorted(((score(r), r.get('population') or 0, r) for r in cands), key=lambda t: (-t[0], -t[1]))
-        best, pop, r = scored[0]
+        exact = lambda r: key(r.get('name') or '') == key(name)   # Eastham beats Easthampton when both fit
+        rank = lambda rs: sorted(((score(r), r.get('population') or 0, r) for r in rs), key=lambda t: (-t[0], -exact(t[2]), -t[1]))
+        best, pop, r = rank(cands)[0]
         if not ctx and not codes: continue                 # a lone word with no country: don't guess
         if not ctx:   # a bare region name ("Pennsylvania", "England"): only a region-level match will do
             cands = [c for c in cands if re.match(r'ADM|PCL|RGN|ISL|AREA', c.get('feature_code') or '')]
@@ -139,8 +141,7 @@ def geocode(loc):
                 reg = region(name, codes)
                 if reg: return reg + [cut, '', 0]
         if not cands: continue
-        scored = sorted(((score(r), r.get('population') or 0, r) for r in cands), key=lambda t: (-t[0], -t[1]))
-        best, pop, r = scored[0]
+        best, pop, r = rank(cands)[0]
         strong = any(key(c) not in BROAD for c in ctx[:-1]) or bool(extra)   # nearer, specific parts exist, so one of them must agree
         if ctx and best < (1 if strong else .4) and not (codes and len(cands) == 1 and not strong): continue
         return [round(r['longitude'], 4), round(r['latitude'], 4), cut, r.get('country_code', '').lower(), round(best, 1)]
