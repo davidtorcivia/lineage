@@ -65,7 +65,8 @@ class Gate(SimpleHTTPRequestHandler):
         self.send(303, Location='/?wait' if recent(ip) >= TRIES else '/?wrong')
 
     def end_headers(self):
-        if self.path.split('?')[0].endswith('.json'): self.send_header('Cache-Control', 'private, no-cache')
+        p = self.path.split('?')[0]   # the page and the data always revalidate, so a deploy reaches everyone at once
+        if p.endswith('.json') or p in ('/', '/index.html'): self.send_header('Cache-Control', 'private, no-cache')
         super().end_headers()
     def log_message(self, fmt, *a):   # Cloudflare's tunnel connects from localhost; log who it says the visitor is
         sys.stderr.write(f"{(getattr(self, 'headers', None) or {}).get('CF-Connecting-IP', self.client_address[0])} {fmt % a}\n")

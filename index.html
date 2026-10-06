@@ -1285,6 +1285,8 @@ function applyTheme() {
 function show(v) {
   const swap = () => {
     VIEW = v; hov = null; showTip(null); play(false); labelCache = {};
+    try { localStorage.setItem('lineage-view', slug(v)); } catch {}   // the tab survives a reload, a new visit, and switching person
+    { const u = new URL(location); u.searchParams.set('view', slug(v)); history.replaceState(null, '', u); }
     nav.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', VIEWS[i] === v));
     capEl.textContent = v.cap; host.hidden = !!(v.map || v.dom); dataEl.hidden = !v.dom; $('#dock').hidden = !!v.dom; mapEl.classList.toggle('off', !v.map); $('#rose').classList.toggle('off', !v.map);
     $('#time').style.display = v.map ? 'flex' : 'none'; $('#sides').hidden = !v.map;
@@ -1320,7 +1322,7 @@ function size() { W = innerWidth; H = innerHeight; axisTop = null; }
 addEventListener('resize', () => { size(); if (VIEW?.dom) VIEW.render(); if (VIEW && !VIEW.map && !VIEW.dom) { VIEW.layout(); VIEW.lkey = lkey(); labelCache = {}; vs = home(); deckgl?.setProps({initialViewState: {o: vs}}); redraw(); } });
 size();
 Promise.all([load(), document.fonts.ready]).then(() => {
-  const want = new URLSearchParams(location.search).get('view');
+  let want = new URLSearchParams(location.search).get('view'); try { want ??= localStorage.getItem('lineage-view'); } catch {}
   show(VIEWS.find(v => slug(v) === want) || tributaries); $('#msg').classList.add('done'); setTimeout(() => $('#msg').remove(), 700);
   if (FIRST) setTimeout(hint, 900);
   // build the other views while nobody's looking, one per idle moment, so the first switch to each is instant too
