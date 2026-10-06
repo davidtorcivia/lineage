@@ -164,7 +164,9 @@ const TAGS = [
 ];
 function culture(loc) {   // first segment that names a known place wins ("Edinburgh, Scotland, United Kingdom" -> Scottish)
   if (!loc) return null;
-  for (const s of loc.split(',').map(x => x.trim())) for (const c of REGIONS) if (c.re.test(s)) return c;
+  // US state names (Maine, Georgia, Delaware...) are also places elsewhere: they count as American only when no other country is named
+  const abroad = /france|francia|england|angleterre|canada|qu(é|e)bec|ireland|scotland|wales|germany|deutschland|preu|italia|italy|spain|españa|nederland|belgi/i.test(loc);
+  for (const s of loc.split(',').map(x => x.trim())) for (const c of REGIONS) if (c.re.test(s) && !(c === AM && abroad)) return c;
   return null;
 }
 function regionAt(lon, lat) {   // fallback from geocoded coordinates when the place name didn't say

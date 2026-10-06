@@ -17,8 +17,9 @@ export = lambda: json.dump(store.places(), open(PF, 'w', encoding='utf-8'), ensu
 UA = {'User-Agent': 'Lineage genealogy viewer'}
 
 CC = [  # keyword in a part of the name -> plausible modern country codes
-    (r'qu[ée]bec|nouvelle-france|new france|bas-canada|lower canada|canada|acadi|nova scotia|new brunswick|ontario', 'ca'),
-    (r'france|francia|francie|royaume des francs|lorraine|alsace|normandie|normandy|bretagne|brittany|perche|aquitaine|gascogne|gascony|provence|toulouse|bourgogne|burgundy|savoie|anjou|poitou|champagne|limoges|picardie|isle-de-france|[iî]le-de-france|armorica|neustria', 'fr'),
+    (r'qu[ée]bec|bas-canada|lower canada|canada|acadi|nova scotia|new brunswick|ontario', 'ca'),
+    (r'nouvelle-france|new france|pays des illinois|louisiane', 'ca,us'),   # New France reached down the Mississippi
+    (r'(?<!nouvelle-)(?<!new )france|francia|francie|royaume des francs|maine|saintonge|aunis|touraine|beauce|lorraine|alsace|normandie|normandy|bretagne|brittany|perche|aquitaine|gascogne|gascony|provence|toulouse|bourgogne|burgundy|savoie|anjou|poitou|champagne|limoges|picardie|isle-de-france|[iî]le-de-france|armorica|neustria', 'fr'),
     (r'gen[èe]ve', 'ch,fr'),
     (r'(?<!new )england|angleterre|britain|britannia|brittania|wessex|mercia|northumbria|east anglia|united kingdom', 'gb'),
     (r'wales|cymru|powys|gwynedd|dyfed|deheubarth|gwent|anglesey|scotland|alba\b|strathclyde|cornwall|dumnonia|orkney', 'gb'),
@@ -50,6 +51,12 @@ ALIAS = {   # historical or local names -> the modern admin names GeoNames uses
     'bayern': 'bavaria', 'sicilia': 'sicily', 'sachsen': 'saxony', 'hessen': 'hesse', 'preussen': 'poland|germany', 'deutschland': 'germany',
     'italia': 'italy', 'espana': 'spain', 'norge': 'norway', 'danmark': 'denmark', 'sverige': 'sweden', 'cymru': 'wales', 'eire': 'ireland',
     'bretagne': 'brittany', 'normandie': 'normandy', 'isle-de-france': 'ile-de-france', 'royaume de france': 'france', 'german empire': 'germany',
+    # French provinces of the Ancien Régime -> today's regions and departments
+    'maine': 'pays de la loire|sarthe|mayenne|maine', 'perche': 'normandy|orne|centre|eure-et-loir', 'anjou': 'pays de la loire|maine-et-loire',
+    'poitou': 'nouvelle-aquitaine|vienne|deux-sevres|vendee', 'saintonge': 'nouvelle-aquitaine|charente', 'aunis': 'nouvelle-aquitaine|charente-maritime',
+    'touraine': 'centre|indre-et-loire', 'beauce': 'centre|eure-et-loir', 'picardie': 'hauts-de-france|somme|aisne|oise', 'champagne': 'grand est|marne|aube|ardennes',
+    'bourgogne': 'burgundy|bourgogne', 'guyenne': 'nouvelle-aquitaine|gironde', 'gascogne': 'nouvelle-aquitaine|occitanie|gers|landes', 'limousin': 'nouvelle-aquitaine|haute-vienne',
+    'auvergne': 'auvergne', 'lyonnais': 'auvergne-rhone-alpes|rhone', 'berry': 'centre|cher|indre', 'orleanais': 'centre|loiret',
     'holy roman empire': 'germany|netherlands|belgium|austria|czechia|switzerland|luxembourg|france|italy',
 }
 BROAD = {'prussia', 'preussen', 'german empire', 'holy roman empire', 'new england', 'canada', 'deutschland', 'germany', 'france', 'england', 'italy', 'italia', 'spain', 'espana', 'united states', 'usa'}   # agreeing with these is weak evidence
@@ -77,13 +84,16 @@ def expect(loc):
     for part in loc.split(','):
         for rx, cc in CC:
             if re.search(rx, part.strip(), re.I): codes.update(cc.split(','))
+    # State and province names are ambiguous (Maine is a US state and a French province): an explicit country decides
+    if re.search(r'\b(usa|united states|america|colony|colonies|new england)\b', loc, re.I): codes &= {'us', 'ca'}
+    elif re.search(r'(?<!nouvelle-)(?<!new )france|england|angleterre|ireland|scotland|wales|germany|deutschland|preu|italy|italia|spain|espa|nederland|netherlands|belgi', loc, re.I): codes.discard('us')
     return codes
 
 cache = {}
 def search(name, codes):
     k = (name, tuple(sorted(codes)))
     if k in cache: return cache[k]
-    p = {'name': name, 'count': 30, 'language': 'en', 'format': 'json'}
+    p = {'name': name, 'count': 100, 'language': 'en', 'format': 'json'}
     if len(codes) == 1: p['countryCode'] = next(iter(codes)).upper()
     for tries in range(5):
         try:
