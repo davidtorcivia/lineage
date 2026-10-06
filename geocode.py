@@ -95,7 +95,7 @@ def search(name, codes):
         except Exception:
             time.sleep(3); res = []
     time.sleep(.12)
-    cache[k] = [r for r in res if not codes or r.get('country_code', '').lower() in codes]
+    cache[k] = [r for r in res if 'longitude' in r and 'latitude' in r and (not codes or r.get('country_code', '').lower() in codes)]
     return cache[k]
 
 def region(name, codes):   # Nominatim knows states and countries; one polite request per such name
@@ -160,7 +160,8 @@ if __name__ == '__main__':
     todo = sorted((l for l in locs if stale(l)), key=lambda l: (near.get(l, 99) // 4, -locs[l]))
     print('places', len(locs), 'to geocode', len(todo))
     for n, loc in enumerate(todo):
-        store.put_place(loc, geocode(loc))
+        try: store.put_place(loc, geocode(loc))
+        except Exception as e: print('skipped', repr(loc), e)   # left unverified, so the next run retries it
         if n % 25 == 0: export(); print('geocoded', n, '/', len(todo))
     export()
     print('done', sum(1 for v in store.places().values() if v), 'hits')

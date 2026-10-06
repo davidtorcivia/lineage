@@ -5,9 +5,10 @@ changes on WikiTree. Requests go through the Message Batches API (asynchronous, 
 resumes the same batch. Needs Claude credentials (ANTHROPIC_API_KEY, or `ant auth login`).
 
     python translate.py            # estimate, submit, wait, store, export
-    python translate.py --dry-run  # just show what would be translated"""
+    python translate.py --dry-run  # just show what would be translated
+    python translate.py --split 16 / --import   # or hand the work to agents as files (see below)"""
 import hashlib, os, re, sys, time
-import anthropic
+import anthropic   # only needed for the Batches path
 from anthropic.types.message_create_params import MessageCreateParamsNonStreaming
 from anthropic.types.messages.batch_create_params import Request
 import store
@@ -36,7 +37,29 @@ bios, done = store.everything('bio'), store.everything('tr')
 todo = {i: b['bio'] for i, b in bios.items() if b.get('bio') and language(b['bio']) != 'en' and done.get(i, {}).get('hash') != digest(b['bio'])}
 chars = sum(len(h) for h in todo.values())
 print(f'{len(todo)} bios to translate, ~{chars / 3.2 / 1e6:.2f}M tokens each way')
-if '--dry-run' in sys.argv or not (todo or os.path.exists(PENDING)): sys.exit()
+if '--dry-run' in sys.argv: sys.exit()
+
+# Agent mode: hand the work to agents as files instead of the Batches API.
+#   --split N   writes _tr/in/<id>.html (one tag per line) and _tr/chunk_<k>.txt (N lists of ids)
+#   --import    reads _tr/out/<id>.html back in, stores each against the original's hash, re-exports
+TR = os.path.join(HERE, '_tr')
+if '--split' in sys.argv:
+    n = int(sys.argv[sys.argv.index('--split') + 1])
+    os.makedirs(os.path.join(TR, 'in'), exist_ok=True); os.makedirs(os.path.join(TR, 'out'), exist_ok=True)
+    ids = sorted(todo, key=lambda i: -len(todo[i]))
+    for i in ids: open(os.path.join(TR, 'in', f'{i}.html'), 'w', encoding='utf-8').write(re.sub(r'>\s*<', '>\n<', todo[i]))
+    for k in range(n): open(os.path.join(TR, f'chunk_{k:02d}.txt'), 'w').write('\n'.join(map(str, ids[k::n])))
+    print('split into', n, 'chunks'); sys.exit()
+if '--import' in sys.argv:
+    out, ok = os.path.join(TR, 'out'), 0
+    for f in os.listdir(out):
+        i = int(f.split('.')[0])
+        if i not in todo: continue
+        html = open(os.path.join(out, f), encoding='utf-8').read().strip()
+        if html: store.put('tr', i, {'hash': digest(todo[i]), 'lang': language(todo[i]), 'html': html}); ok += 1
+    store.commit(); store.export_bios(); print('imported', ok, 'of', len(todo)); sys.exit()
+
+if not (todo or os.path.exists(PENDING)): sys.exit()
 
 client = anthropic.Anthropic()
 if os.path.exists(PENDING):
