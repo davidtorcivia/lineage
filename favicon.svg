@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>rect{fill:#f3eee5}path{stroke:#2a2118}circle{fill:#2a2118}@media (prefers-color-scheme:dark){rect{fill:#0b0c0f}path{stroke:#ebe5d8}circle{fill:#ebe5d8}}</style>
+  <rect width="64" height="64" rx="14"/>
+  <g fill="none" stroke-width="3.2" stroke-linecap="round">
+    <path d="M12 9 C12 28 30 34 32 50"/><path d="M24 9 C24 26 31 36 32 50" opacity=".7"/>
+    <path d="M40 9 C40 26 33 36 32 50" opacity=".7"/><path d="M52 9 C52 28 34 34 32 50"/>
+  </g>
+  <circle cx="32" cy="51" r="4.6"/>
+</svg>

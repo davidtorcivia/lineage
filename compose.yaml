@@ -1,0 +1,14 @@
+services:
+  lineage:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${LINEAGE_PORT:-8080}:8080"   # loopback only: put a reverse proxy or tunnel in front
+    environment:
+      PASSWORD: ${LINEAGE_PASSWORD:?set LINEAGE_PASSWORD in .env}
+    volumes:
+      - ./public:/data:ro   # index.html, tree.json, places.json, bios/ (synced by deploy.sh, no rebuild needed)
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    logging: {driver: json-file, options: {max-size: 10m, max-file: "3"}}

@@ -14,6 +14,7 @@ def get(t, i):
 def put(t, i, data, touched=None):   # caller commits (once per API batch)
     db.execute(f"insert or replace into {t} values (?, ?, ?, datetime('now'))", (i, json.dumps(data, ensure_ascii=False), touched))
 def has(t): return {i for (i,) in db.execute(f'select id from {t}')}
+def touched(t): return dict(db.execute(f'select id, touched from {t}'))
 def everything(t): return {i: json.loads(d) for i, d in db.execute(f'select id, data from {t}')}
 def place(loc):
     row = db.execute('select data from place where loc = ?', (loc,)).fetchone()
