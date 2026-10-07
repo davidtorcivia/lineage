@@ -140,6 +140,9 @@ body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)
 @media (prefers-reduced-motion:reduce){#msg *{animation:none!important}}
 #hint{position:fixed;top:62px;right:12px;z-index:9;max-width:250px;padding:11px 14px;border-radius:14px;font:13px/1.45 var(--sans);color:var(--ink);cursor:pointer;animation:rise .4s cubic-bezier(.2,.8,.2,1) both}
 #hint[hidden]{display:none}
+#hint.news{top:auto;bottom:22px;left:16px;right:16px;margin:auto;width:fit-content;max-width:340px}
+#hint.news::before{display:none}
+#hint.news u{text-underline-offset:3px;white-space:nowrap}
 #hint::before{content:'';position:absolute;top:-6px;right:var(--ax,40px);width:10px;height:10px;transform:rotate(45deg);background:var(--solid);border-left:1px solid var(--line);border-top:1px solid var(--line)}
 #map.off,#rose.off{visibility:hidden;pointer-events:none}
 #map.off .maplibregl-control-container{display:none}   /* its controls set their own visibility */
@@ -206,6 +209,7 @@ body.po .maplibregl-ctrl-bottom-right{right:calc(min(400px,100vw - 24px) + 24px)
   #panel{top:auto;left:8px;right:8px;bottom:8px;width:auto;height:72vh;transform:translateY(calc(100% + 16px));scrollbar-width:none}
   #panel::-webkit-scrollbar{display:none}
   #hint{top:52px;right:8px;--ax:12px}
+  #hint.news{top:auto;bottom:calc(var(--dh,0px) + 20px)}
   #search{top:52px;left:8px;right:8px;width:auto}
   /* narrow screens: the tools fold into a menu behind one gear, so the view tabs keep the bar */
   #gear{display:grid;margin-left:auto;width:34px;height:34px;flex:none}
@@ -338,7 +342,7 @@ function regionAt(lon, lat) {   // fallback from geocoded coordinates when the p
 
 // ================= data =================
 const yr = d => { const m = /^(\d{4})/.exec(d || ''); return m && m[1] !== '0000' ? +m[1] : null; };
-let N = [], ROOT, Y0 = 1450, leafN = 0, LEAVES = [], ME = [], SIDE = 0, FIRST = false;
+let N = [], ROOT, Y0 = 1450, leafN = 0, LEAVES = [], ME = [], SIDE = 0, FIRST = false, NEWS = 0;
 const BY = p => p.by ?? p.byE;
 const TP = .6, tn = v => 1 - Math.pow(Math.max(0, 2026 - v) / (2026 - Y0), TP);   // Y0 -> 0, today -> 1
 // loading screen
@@ -356,6 +360,29 @@ const choose = people => new Promise(res => {
   stage(`<h2>Who’s exploring?</h2><div class="who">${people.map(p => `<button data-k="${p.given.toLowerCase()}">${p.given}</button>`).join('')}</div>`);
   $('#msg .who').onclick = e => { const b = e.target.closest('button'); if (b) res(b.dataset.k); };
 });
+// new since the last visit: each device remembers who it has seen. Newcomers get a tag (first in the list) that stays
+// until the next batch arrives, and the visit that finds them says so once.
+const FRESH = new Set();
+function freshness(ids) {
+  try {
+    const known = JSON.parse(localStorage.getItem('lineage-known') || 'null');
+    localStorage.setItem('lineage-known', JSON.stringify(ids));
+    if (!known) return 0;   // a first visit: everyone is new, so nobody is
+    const k = new Set(known), add = ids.filter(i => !k.has(i));
+    if (add.length) localStorage.setItem('lineage-fresh', JSON.stringify(add));
+    for (const i of add.length ? add : JSON.parse(localStorage.getItem('lineage-fresh') || '[]')) FRESH.add(i);
+    if (FRESH.size) TAGS.unshift({k: 'Newly added', test: p => FRESH.has(p.Id)});
+    return add.length;
+  } catch { return 0; }
+}
+function news() {   // "7 ancestors added since your last visit": a tap lights them up
+  const c = new Set(N.filter(n => FRESH.has(n.p.Id)).map(n => n.p)).size; if (!c) return;
+  const h = $('#hint'); h.classList.add('news'); h.hidden = false;
+  h.innerHTML = `${c === 1 ? 'One ancestor was' : c.toLocaleString() + ' ancestors were'} added since your last visit. <u>Show them</u>`;
+  const off = () => { h.hidden = true; h.classList.remove('news'); h.onpointerdown = null; removeEventListener('pointerdown', off); };
+  h.onpointerdown = e => { e.stopPropagation(); off(); if (VIEW.dom) show(tributaries); pinCu = hlCu = groupByK('Newly added'); refocus(); };
+  setTimeout(() => addEventListener('pointerdown', off), 300); setTimeout(off, 15000);
+}
 function hint() {   // once, after the first choice: where to change it later
   const h = $('#hint'), narrow = matchMedia('(max-width: 720px)').matches;
   h.textContent = narrow ? 'You can switch whose family you’re viewing anytime, under the gear.' : 'You can switch whose family you’re viewing anytime, here.';
@@ -383,6 +410,7 @@ async function load() {
     if (p.loc) p.loc = jit(p.loc, p.Id, .04);
     p.cu = culture(p.BirthLocation) || culture(p.DeathLocation) || (b && regionAt(...b)) || (d && regionAt(...d)) || UNK;
   }
+  NEWS = freshness(Object.keys(P).map(Number));
   // nodes: one per place a person occupies in the pedigree. A person reached again (pedigree collapse) is a
   // leaf marked dup; their ancestry is drawn once, at their nearest generation.
   const r0 = P[tree.root], par = [r0.Father, r0.Mother].filter(i => i > 0 && P[i]);
@@ -599,7 +627,7 @@ function refocus() { fkey++; redraw(); legendState(); }
 function initDeck() {
   deckgl = new deck.Deck({
     parent: host, views: new deck.OrthographicView({id: 'o', flipY: true}),
-    initialViewState: {o: home()}, controller: {scrollZoom: {speed: .012, smooth: true}, inertia: 650, doubleClickZoom: true},
+    initialViewState: {o: home()}, controller: {scrollZoom: false, inertia: 650, doubleClickZoom: true},   // wheel zoom is ours, below
     pickingRadius: 8, useDevicePixels: Math.min(devicePixelRatio, 2),   // 3x phone screens cost a lot of fill for no visible gain
     onViewStateChange: ({viewState}) => { vs = viewState; redraw(); },
     onInteractionStateChange: s => { const m = !!(s.isDragging || s.isPanning || s.isZooming || s.inTransition); if (moving && !m) { moving = m; redraw(); } else moving = m; },
@@ -608,6 +636,30 @@ function initDeck() {
     getCursor: ({isDragging, isHovering}) => isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab',
   });
 }
+// wheel zoom: deck's curve squashed a trackpad's small deltas (a whole pinch zoomed ~1.1x) and its smoothing lagged the fingers.
+// Trackpads (pixel deltas; a pinch arrives as ctrl+wheel) follow the fingers frame by frame; mouse notches glide to their target.
+let wheel = null, wheelEnd = 0;
+function zoomAt(z, x, y) {   // keep the world point under (x, y) under it
+  const a = 2 ** -vs.zoom - 2 ** -z, [tx, ty] = vs.target;
+  vs = {...vs, target: [tx + (x - W / 2) * a, ty + (y - H / 2) * a, 0], zoom: z, transitionDuration: 0};
+  deckgl.setProps({initialViewState: {o: vs}}); redraw();
+}
+function wheelTick() {
+  const w = wheel, dz = w.z - vs.zoom;
+  zoomAt(w.snap || Math.abs(dz) < .003 ? w.z : vs.zoom + dz * .3, w.x, w.y);
+  if (vs.zoom !== w.z) return requestAnimationFrame(wheelTick);
+  wheel = null; clearTimeout(wheelEnd); wheelEnd = setTimeout(() => { moving = false; redraw(); }, 140);   // settled: names re-place
+}
+host.addEventListener('wheel', e => {
+  e.preventDefault(); if (!deckgl || !VIEW || VIEW.map || VIEW.dom) return;
+  const d = e.deltaMode === 1 ? e.deltaY * 40 : e.deltaY;
+  // a mouse notch: line mode, Chrome/Safari's 4.000244 multiples on macOS, or a big whole number elsewhere (100/120 on Windows)
+  const notch = !e.ctrlKey && (e.deltaMode === 1 || d % 4.000244140625 === 0 || (Math.abs(d) >= 50 && Number.isInteger(d)));
+  const dz = notch ? -Math.sign(d) * .3 : -d / (e.ctrlKey ? 70 : 110);
+  const z = Math.max(-1, Math.min(9, (wheel?.z ?? vs.zoom) + dz));
+  moving = true; clearTimeout(wheelEnd);
+  const was = wheel; wheel = {z, x: e.clientX, y: e.clientY, snap: !notch}; if (!was) requestAnimationFrame(wheelTick);
+}, {passive: false});
 // deck ignores an initialViewState equal to the last one given, even if the user has moved since; a tiny alternating nudge makes every reset land
 let nudge = 0;
 const home = () => ({target: [W / 2, H / 2, 0], zoom: (++nudge % 2) * 1e-6, minZoom: -1, maxZoom: 9});
@@ -1345,7 +1397,7 @@ size();
 Promise.all([load(), document.fonts.ready]).then(() => {
   let want = new URLSearchParams(location.search).get('view'); try { want ??= localStorage.getItem('lineage-view'); } catch {}
   show(VIEWS.find(v => slug(v) === want) || tributaries); $('#msg').classList.add('done'); setTimeout(() => $('#msg').remove(), 700);
-  if (FIRST) setTimeout(hint, 900);
+  if (FIRST) setTimeout(hint, 900); else if (NEWS) setTimeout(news, 900);
   // build the other views while nobody's looking, one per idle moment, so the first switch to each is instant too
   const idle = f => (window.requestIdleCallback || (g => setTimeout(g, 1200)))(f, {timeout: 4000});
   idle(() => { map || initMap(); idle(() => { for (const v of VIEWS) if (!v.map && !v.dom && !PARKED[v.name]) prewarm(v); }); });
