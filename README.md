@@ -3,7 +3,15 @@
 A local, GPU-rendered art piece for exploring every known direct ancestor of a WikiTree profile.
 
 Views: **Tributaries** (strands through time), **Constellation** (birthplaces on a map, animated through the centuries),
-**Tree Rings** (a radial cross-section of the family).
+**Tree Rings** (a radial cross-section of the family), plus a **Data** page of the tree in numbers.
+
+![Tributaries: every line of descent as a strand through time, coloured by birthplace](docs/tributaries.png)
+
+![Constellation: birthplaces on an old-atlas map, with migration arcs](docs/constellation.png)
+
+| Tree Rings | Data |
+| --- | --- |
+| ![Tree Rings: the family as a radial cross-section](docs/rings.png) | ![Data: counts, origins, completeness by generation](docs/data.png) |
 
 ## Run
 
