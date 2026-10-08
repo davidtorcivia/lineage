@@ -26,3 +26,7 @@ the moment it arrives, so an interrupted run loses nothing and nothing is fetche
    `ANTHROPIC_API_KEY` or `ant auth login`). `--dry-run` shows what it would send.
 
 The viewer reads the exported `tree.json`, `bios/<Id % 64>.json` and `places.json`.
+
+## License
+
+MIT, see `LICENSE`.
