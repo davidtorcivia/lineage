@@ -446,7 +446,9 @@ async function load() {
   }
   const sidesEl = $('#sides');
   sidesEl.innerHTML = ['Both', ROOT.f?.p.sur, ROOT.m?.p.sur].map((k, i) => k ? `<button data-s="${i}"${i ? '' : ' class="on"'}>${k}</button>` : '').join('');
-  sidesEl.onclick = e => { const b = e.target.closest('button'); if (!b) return; SIDE = +b.dataset.s; sidesEl.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); redraw(); };
+  sidesEl.onclick = e => { const b = e.target.closest('button'); if (!b) return; SIDE = +b.dataset.s; sidesEl.querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    if (sel && !shown(sel)) deselect();
+    if (VIEW.map || VIEW.dom) { widen(null, true); refocus(); } else widen(null); };   // the shown side takes the whole width
   for (const n of N) {   // children come before their parents in N, so estimates and places flow up the tree
     const p = n.p;
     if (p.by == null && p.byE == null) p.byE = n.c ? BY(n.c.p) - (p.Gender === 'Female' ? 27 : 31) : p.dy ? p.dy - 55 : 1990;
@@ -484,10 +486,14 @@ async function load() {
   $('#yr').min = Y0;
 }
 // horizontal placement: each leaf line gets a share of the width proportional to its weight
+let SIDEK = 1;
+const onSide = n => !SIDE || !n.side || n.side === (SIDE === 1 ? 'paternal' : 'maternal');   // the side filter, per drawn node
+const shown = n => VIEW?.map ? !SIDE || !!(n.p.sb & SIDE) : onSide(n);   // the map draws each person once, so there it goes by everyone's sides
 function place(weight) {
   let acc = 0;
-  for (const l of LEAVES) { const w = weight(l); l.u1 = acc + w / 2; acc += w; }
-  (function up(n) { const ks = [n.f, n.m].filter(Boolean); ks.forEach(up); if (ks.length) n.u1 = ks.reduce((s, k) => s + k.u1, 0) / ks.length; })(ROOT);
+  SIDEK = leafN / Math.max(1, LEAVES.filter(onSide).length);
+  for (const l of LEAVES) { const w = onSide(l) ? weight(l) : 0; l.u1 = acc + w / 2; acc += w; }
+  (function up(n) { const all = [n.f, n.m].filter(Boolean); all.forEach(up); const ks = all.filter(onSide).length ? all.filter(onSide) : all; if (ks.length) n.u1 = ks.reduce((s, k) => s + k.u1, 0) / ks.length; })(ROOT);
   N.forEach(n => n.un1 = n.u1 / acc);
 }
 
@@ -603,7 +609,9 @@ const SC = () => 2 ** vs.zoom;
 const SX = x => (x - vs.target[0]) * SC() + W / 2, SY = y => (y - vs.target[1]) * SC() + H / 2;
 const zs = () => 2 ** (vs.zoom * .28);                 // strokes thicken gently as you zoom in
 let fkey = 0;                                           // bumped on every focus change so colour accessors re-run
-const A = (n, on, off) => !focusing() ? on : lit(n) ? Math.min(255, on * 1.5) : off;   // alpha 0–255
+const A = (n, on, off) => !shown(n) ? 0 : !focusing() ? on : lit(n) ? Math.min(255, on * 1.5) : off;   // alpha 0–255
+const SIDEF = new deck.DataFilterExtension({filterSize: 1});   // filtered objects are neither drawn nor picked
+const sideF = () => ({extensions: [SIDEF], getFilterValue: d => onSide(d.n) ? 1 : 0, filterRange: [1, 1]});
 const FADE = {getColor: 260, getFillColor: 260, getLineColor: 260};
 const ADD = {blend: true, blendColorOperation: 'add', blendColorSrcFactor: 'src-alpha', blendColorDstFactor: 'one',
              blendAlphaOperation: 'add', blendAlphaSrcFactor: 'one', blendAlphaDstFactor: 'one-minus-src-alpha'};
@@ -631,8 +639,8 @@ function initDeck() {
     pickingRadius: 8, useDevicePixels: Math.min(devicePixelRatio, 2),   // 3x phone screens cost a lot of fill for no visible gain
     onViewStateChange: ({viewState}) => { vs = viewState; redraw(); },
     onInteractionStateChange: s => { const m = !!(s.isDragging || s.isPanning || s.isZooming || s.inTransition); if (moving && !m) { moving = m; redraw(); } else moving = m; },
-    onHover: ({object, x, y}) => { const n = object?.n ?? null; if (n !== hov) { hov = n; refocus(); } if (!coarse) showTip(n, x, y); },
-    onClick: ({object}) => object ? select(object.n) : deselect(),
+    onHover: ({object, x, y}) => { const n = object && shown(object.n) ? object.n : null; if (n !== hov) { hov = n; refocus(); } if (!coarse) showTip(n, x, y); },
+    onClick: ({object}) => object && shown(object.n) ? select(object.n) : deselect(),
     getCursor: ({isDragging, isHovering}) => isDragging ? 'grabbing' : isHovering ? 'pointer' : 'grab',
   });
 }
@@ -681,7 +689,7 @@ function ticks(v) {
   }
 }
 function axis(v) {
-  axisEl.style.opacity = v.y ? 1 : 0; if (!v.y) return;
+  axisEl.style.opacity = v.y ? 1 : 0; document.body.classList.toggle('rail', !!v.y); if (!v.y) return;   // v.y appears only after the first layout
   axisTop ??= axisEl.getBoundingClientRect().top;   // read once (reset on resize): reading layout between writes forced a reflow per tick
   const sp = pool(axisEl, TICKS.length);
   TICKS.forEach(([y, sy], i) => { const s = sp[i]; if (s.textContent !== String(y)) s.textContent = y; s.style.transform = `translate3d(0,${sy - axisTop}px,0) translateY(-50%)`; });
@@ -711,7 +719,7 @@ function placeLabels(v) {   // world-anchored names, moved with the view each fr
 function labelLayer(v, mm) {
   const s = person(), base = [fkey, v.name, v.gen, stretch].join('|'), key = Math.round(vs.zoom * 4) + '|' + base;
   if (labelCache.key !== key && !(moving && labelCache.base === base)) {   // mid-gesture, keep the last placement (it's world-anchored)
-    const k = SC(), f = focusing(), cand = v.dots.filter(d => d.n === s || (f ? lit(d.n) && v.wide(d.n) > 20 : v.wide(d.n) > 70))
+    const k = SC(), f = focusing(), cand = v.dots.filter(d => onSide(d.n) && (d.n === s || (f ? lit(d.n) && v.wide(d.n) > 20 : v.wide(d.n) > 70)))
       .sort((a, b) => (b.n === s) - (a.n === s) || (focusing() ? lit(b.n) - lit(a.n) : 0) || a.n.g - b.n.g);
     const cell = new Map(), out = [], hit = (gx, gy, r) => (cell.get(gx + ',' + gy) || []).some(q => r[0] < q[2] && q[0] < r[2] && r[1] < q[3] && q[1] < r[3]);
     for (const d of cand) {
@@ -732,12 +740,12 @@ function dotLayers(v, r, mm) {
   return [
     new deck.ScatterplotLayer({id: 'dup', data: v.dups, getPosition: d => [d.x, d.y], filled: false, stroked: true, radiusUnits: 'pixels', getRadius: r + 2.8,
       radiusScale: z, lineWidthUnits: 'pixels', getLineWidth: .9, getLineColor: d => [...CC(d.n.p.cu), A(d.n, 190, 18)], modelMatrix: mm,
-      updateTriggers: {getLineColor: [fkey, dark]}, transitions: FADE}),
+      ...sideF(), updateTriggers: {getLineColor: [fkey, dark], getFilterValue: SIDE}, transitions: FADE}),
     new deck.ScatterplotLayer({id: 'dots', data: v.dots, getPosition: d => [d.x, d.y], radiusUnits: 'pixels', getRadius: r, radiusScale: z,
       stroked: true, lineWidthUnits: 'pixels', lineWidthScale: z, getLineWidth: d => est(d) ? 1.2 : 1.4, modelMatrix: mm,
       getFillColor: d => est(d) ? [...BG(), A(d.n, 255, 30)] : [...CC(d.n.p.cu), A(d.n, 255, 30)],
       getLineColor: d => est(d) ? [...CC(d.n.p.cu), A(d.n, 255, 30)] : [...BG(), A(d.n, 255, 30)],
-      pickable: true, updateTriggers: {getFillColor: [fkey, dark], getLineColor: [fkey, dark]}, transitions: FADE}),
+      pickable: true, ...sideF(), updateTriggers: {getFillColor: [fkey, dark], getLineColor: [fkey, dark], getFilterValue: SIDE}, transitions: FADE}),
   ];
 }
 const youLayer = (v, mm) => new deck.ScatterplotLayer({id: 'you', data: [v.at(ROOT)], getPosition: d => d, radiusUnits: 'pixels', getRadius: 5, modelMatrix: mm,
@@ -754,16 +762,17 @@ const dotsOf = v => { v.dots = N.map(n => { const [x, y] = v.at(n); return {n, x
 // frame a person's whole branch (them and everyone above them)
 function fit(n) {
   let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-  for (let i = n.pre; i <= n.post; i++) { const [x, y] = VIEW.sat(N[i]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  for (let i = n.pre; i <= n.post; i++) { if (!onSide(N[i])) continue; const [x, y] = VIEW.sat(N[i]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
   const pw = innerWidth > 720 && panel.classList.contains('open') ? 420 : 0;
   const z = Math.max(-1, Math.min(6, Math.log2(Math.min((W - pw - 140) / Math.max(1, x1 - x0), (H - 160) / Math.max(1, y1 - y0)))));
   flyTo([(x0 + x1) / 2 + pw / 2 / 2 ** z, (y0 + y1) / 2], z);
 }
 // ---- give a branch more room: leaves under it get a bigger share, and everything glides there
-function widen(n) {
+function widen(n, now) {   // now: no animation (the view showing doesn't use this layout)
   if (n) { const s = n.hi - n.lo + 1, f = Math.max(1, .6 * (leafN - s) / (s * .4)); place(l => l.lo >= n.lo && l.lo <= n.hi ? f : 1); }
   else place(() => 1);
   widened = !!n; $('#even').hidden = !widened;
+  if (now) { N.forEach(n => n.un = n.un1); UNGEN++; return; }
   const from = N.map(n => n.un), t0 = performance.now(), v = VIEW;
   const step = t => {
     const u = Math.min(1, (t - t0) / 750), e = easeInOut(u);
@@ -787,14 +796,14 @@ const tributaries = {
   },
   at(n) { return [this.X(n), this.y(BY(n.p))]; },
   sat(n) { const [x, y] = this.at(n); return [W / 2 + (x - W / 2) * stretch, y]; },   // with spread applied
-  wide(n) { return (n.hi - n.lo + 1) * (W - this.l - 24) / leafN * stretch * SC() * (widened ? 2 : 1); },
+  wide(n) { return (n.hi - n.lo + 1) * (W - this.l - 24) / leafN * stretch * SC() * (widened ? 2 : 1) * SIDEK; },
   mm() { return [stretch, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, W / 2 * (1 - stretch), 0, 0, 1]; },
   layers() {
     const mm = this.mm();
     return [grid(),
       new deck.PathLayer({id: 'strands', data: this.strands, getPath: d => d.path, getWidth: d => .5 + d.w * .42, widthUnits: 'pixels', widthScale: zs(),
         capRounded: true, jointRounded: true, getColor: d => [...CC(d.n.p.cu), A(d.n, dark ? 150 : 230, 14)], pickable: true, parameters: blendP(), modelMatrix: mm,
-        updateTriggers: {getColor: [fkey, dark]}, transitions: FADE}),
+        ...sideF(), updateTriggers: {getColor: [fkey, dark], getFilterValue: SIDE}, transitions: FADE}),
       ...dotLayers(this, 1.9, mm), youLayer(this, mm), labelLayer(this, mm)];
   },
 };
@@ -822,7 +831,7 @@ const rings = {
   },
   at(n) { return this.p(BY(n.p), this.th(n)); },
   sat(n) { return this.at(n); },
-  wide(n) { return (n.hi - n.lo + 1) / leafN * 2 * Math.PI * this.r(BY(n.p)) * SC() * (widened ? 2 : 1); },
+  wide(n) { return (n.hi - n.lo + 1) / leafN * 2 * Math.PI * this.r(BY(n.p)) * SC() * (widened ? 2 : 1) * SIDEK; },
   layers() {
     const ink = INK();
     return [
@@ -830,7 +839,7 @@ const rings = {
         getColor: d => [...ink, d.c ? 80 : 26], updateTriggers: {getColor: dark}}),
       new deck.PathLayer({id: 'strands', data: this.strands, getPath: d => d.path, getWidth: d => .6 + d.w * .38, widthUnits: 'pixels', widthScale: zs(),
         capRounded: true, jointRounded: true, getColor: d => [...CC(d.n.p.cu), A(d.n, dark ? 175 : 235, 14)], pickable: true, parameters: blendP(),
-        updateTriggers: {getColor: [fkey, dark]}, transitions: FADE}),
+        ...sideF(), updateTriggers: {getColor: [fkey, dark], getFilterValue: SIDE}, transitions: FADE}),
       ...dotLayers(this, 1.9), youLayer(this), labelLayer(this), this.pills()];
   },
   pills() {   // year labels on a radial scale along the first visible spoke (straight up when possible)
@@ -956,8 +965,8 @@ function initMap() {
   constellation.build();
   map = new maplibregl.Map({container: 'map', style: {version: 8, sources: {}, layers: [{id: 'background', type: 'background', paint: {'background-color': INKS().bg}}]}, bounds: constellation.bounds, fitBoundsOptions: {padding: 70}, attributionControl: {compact: true}});
   overlay = new deck.MapboxOverlay({interleaved: false, layers: constellation.layers(), pickingRadius: 10,
-    onHover: ({object, x, y}) => { const n = object?.n ?? null; if (n !== hov) { hov = n; refocus(); } if (!coarse) showTip(n, x, y); },
-    onClick: ({object}) => object ? select(object.n) : deselect(),
+    onHover: ({object, x, y}) => { const n = object && shown(object.n) ? object.n : null; if (n !== hov) { hov = n; refocus(); } if (!coarse) showTip(n, x, y); },
+    onClick: ({object}) => object && shown(object.n) ? select(object.n) : deselect(),
     getCursor: ({isHovering}) => isHovering ? 'pointer' : 'grab'});
   map.addControl(overlay); restyle();
   const papers = () => { for (const [id, img] of Object.entries(PAPER)) if (!map.hasImage(id)) map.addImage(id, img); };
@@ -1362,7 +1371,7 @@ function show(v) {
     { const u = new URL(location); u.searchParams.set('view', slug(v)); history.replaceState(null, '', u); }
     nav.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', VIEWS[i] === v));
     capEl.textContent = v.cap; host.hidden = !!(v.map || v.dom); labelsEl.hidden = !!(v.map || v.dom); dataEl.hidden = !v.dom; $('#dock').hidden = !!v.dom; mapEl.classList.toggle('off', !v.map); $('#rose').classList.toggle('off', !v.map);
-    $('#time').style.display = v.map ? 'flex' : 'none'; $('#sides').hidden = !v.map;
+    $('#time').style.display = v.map ? 'flex' : 'none'; $('#sides').hidden = !!v.dom;
     $('#ctrl').style.display = v.spread ? 'flex' : 'none';
     axisEl.style.opacity = v.y ? 1 : 0; document.body.classList.toggle('rail', !!v.y);
     if (v.dom) {}
@@ -1371,6 +1380,7 @@ function show(v) {
       if (v.lkey !== lkey()) { v.layout(); v.lkey = lkey(); }
       vs = home();
       if (!deckgl) initDeck(); else deckgl.setProps({initialViewState: {o: home()}});
+      if (sel && !shown(sel)) sel = N.find(m => m.p === sel.p && shown(m)) || (deselect(), null);   // the map's pick may be this person's copy on the hidden side
       if (sel) select(sel, true);
     }
     applyTheme(); requestAnimationFrame(() => { host.classList.remove('fade'); mapEl.classList.remove('fade'); });
@@ -1387,10 +1397,16 @@ addEventListener('keydown', e => {
   if (e.key === '[' || e.key === ']') setSpread(Math.min(1, Math.max(0, +$('#spread').value + (e.key === ']' ? .08 : -.08))));
   if (e.key === ' ' && VIEW.map) { e.preventDefault(); play(!playing); }
   if (e.key === 'Escape') { panel.classList.contains('open') ? closePanel() : deselect(); if (hlCu || pinCu) { hlCu = pinCu = null; refocus(); } }
-  if (sel && ['ArrowUp', 'ArrowDown'].includes(e.key)) {   // walk the line: up = father (shift: mother), down = child
-    e.preventDefault(); const n = e.key === 'ArrowDown' ? sel.c : (e.shiftKey ? sel.m || sel.f : sel.f || sel.m); if (n) select(n, true);
-  }
+  if (sel && e.key.startsWith('Arrow') && !(e.altKey || e.ctrlKey || e.metaKey)) { e.preventDefault(); const n = walk(sel, e.key); if (n && n !== sel && shown(n)) select(n, true); }
 });
+// walk the line: up = the parent you last came down from (father at first), down = child,
+// left/right = father's / mother's line (the couple above the child; fathers are drawn on the left). A dup leaf climbs on from its drawn copy.
+const cameFrom = new WeakMap();
+function walk(n, key) {
+  if (key === 'ArrowDown') { if (n.c) cameFrom.set(n.c, n); return n.c; }
+  if (key === 'ArrowUp') { const s = n.dup ? N.find(m => m.p === n.p && !m.dup) || n : n; return [cameFrom.get(s), s.f, s.m].find(x => x && shown(x)); }
+  const c = n.c, to = c && (key === 'ArrowLeft' ? c.f : c.m); if (to) cameFrom.set(c, to); return to;
+}
 function size() { W = innerWidth; H = innerHeight; axisTop = null; }
 addEventListener('resize', () => { size(); if (VIEW?.dom) VIEW.render(); if (VIEW && !VIEW.map && !VIEW.dom) { VIEW.layout(); VIEW.lkey = lkey(); labelCache = {}; vs = home(); deckgl?.setProps({initialViewState: {o: vs}}); redraw(); } });
 size();
